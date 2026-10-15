@@ -8,6 +8,13 @@ NAME="ceia-agent-$VERSION-linux-aarch64"
 OUT="$ROOT/dist"; STAGE="$(mktemp -d)/$NAME"
 PY="${PYTHON:-python3}"
 mkdir -p "$STAGE/wheels" "$OUT"
+# Venvs criados pelo uv não têm pip: nesse caso usa um venv temporário só para o build.
+if ! "$PY" -m pip --version >/dev/null 2>&1; then
+  BUILD_VENV="$(dirname "$STAGE")/build-venv"
+  "$PY" -m venv "$BUILD_VENV" || { echo "Sem pip em $PY; defina PYTHON=/caminho/do/python3 com pip"; exit 1; }
+  PY="$BUILD_VENV/bin/python"
+  "$PY" -m pip install --quiet --upgrade pip
+fi
 
 # Wheel do próprio agente (puro Python).
 "$PY" -m pip wheel --quiet --no-deps --wheel-dir "$STAGE/wheels" "$ROOT/agent"
