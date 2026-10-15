@@ -5,7 +5,7 @@ Monitoramento histórico e análise de capacidade das NVIDIA DGX Sparks do CEIA-
 - **`agent/`** — agente Python (psutil + NVML/`nvidia-smi`), serviço systemd, buffer SQLite, envio em lote com retry.
 - **`backend/`** — FastAPI, SQLAlchemy, Alembic; PostgreSQL/TimescaleDB em produção (SQLite em dev/testes).
 - **`frontend/`** — Next.js + Tailwind + Recharts (dashboard, análise, projetos, alertas, administração).
-- **`deploy/`** — Docker Compose da plataforma central. **`scripts/`** — instalação do agente, backup/restore, demo. **`docs/`** — arquitetura, métricas, operação.
+- **`deploy/`** — Docker Compose da plataforma central. **`packaging/`** — builds de distribuição (Sparks e central). **`scripts/`** — instalação do agente, backup/restore, demo. **`docs/`** — arquitetura, métricas, operação.
 
 ## Estado verificado
 
@@ -34,7 +34,25 @@ cd backend && .venv/bin/pytest ; cd ../agent && uv venv --python 3.13 && uv pip 
 
 Modo demonstração (dados sintéticos, identificado por selo): `DATABASE_URL=sqlite:///demo.db python ../scripts/seed_demo.py` a partir de `backend/`.
 
-## Implantar a plataforma central
+## Builds de distribuição (`packaging/`)
+
+```bash
+packaging/build.sh agent                    # dist/ceia-agent-<versão>-linux-aarch64.tar.gz  → Sparks
+packaging/build.sh central                  # dist/ceia-central-<versão>.tar.gz              → máquina central
+packaging/build.sh central --images --platform linux/amd64   # inclui imagens Docker (instalação offline; exige Docker/buildx)
+packaging/build.sh all                      # os dois
+```
+
+A versão da central é `backend/pyproject.toml` + commit (`1.0.0-3201a65`, com `-dirty` se houver alterações não commitadas). O pacote contém só arquivos versionados de `backend/`, `frontend/`, `deploy/`, os scripts de backup/restauração e `install.sh`. Na central (Linux com Docker e o plugin compose):
+
+```bash
+tar xzf ceia-central-*.tar.gz && cd ceia-central-*
+sudo ./install.sh [--port 80] [--bind 0.0.0.0] [--site monitor.exemplo.com]
+```
+
+Instala em `/opt/ceia-compute-observatory/central` (`--prefix` muda). Na primeira vez gera o `.env` com segredos aleatórios e mostra a senha do admin **uma única vez**; nas atualizações mantém o `.env` e o banco (o projeto compose continua `deploy`, mesmos volumes), carrega as imagens do pacote se houver ou constrói, e espera `/api/v1/health` responder.
+
+## Implantar a plataforma central a partir do repositório
 
 ```bash
 cp .env.example .env     # defina POSTGRES_PASSWORD, SECRET_KEY, ADMIN_PASSWORD (BIND_ADDR/HTTP_PORT opcionais)
@@ -46,7 +64,7 @@ Funciona igual em localhost ou numa VPS, sem domínio nem certificado: o Caddy (
 
 ## Cadastrar máquinas e instalar o agente
 
-**Pacote pronto (recomendado):** `scripts/build-agent-package.sh` gera `dist/ceia-agent-<versão>-linux-aarch64.tar.gz` com o agente, as dependências ARM64 (instalação offline) e o instalador. Na Spark:
+**Pacote pronto (recomendado):** `packaging/build.sh agent` gera `dist/ceia-agent-<versão>-linux-aarch64.tar.gz` com o agente, as dependências ARM64 (instalação offline) e o instalador. Na Spark:
 ```bash
 tar xzf ceia-agent-*-linux-aarch64.tar.gz && cd ceia-agent-*-linux-aarch64
 sudo ./install.sh --url http://<IP-da-central> --token ceia_agt_...

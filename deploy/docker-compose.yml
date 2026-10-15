@@ -16,6 +16,8 @@ services:
     # sem 'ports': o banco não é exposto ao host
 
   backend:
+    # APP_VERSION vem do pacote da central (packaging/central); imagens pré-carregadas são usadas sem rebuild.
+    image: ceia-observatory-backend:${APP_VERSION:-local}
     build: ../backend
     restart: unless-stopped
     depends_on: { db: { condition: service_healthy } }
@@ -31,6 +33,7 @@ services:
     ports: ["127.0.0.1:${BACKEND_PORT:-8000}:8000"]
 
   frontend:
+    image: ceia-observatory-frontend:${APP_VERSION:-local}
     build:
       context: ../frontend
       args: { BACKEND_URL: "http://backend:8000" }
