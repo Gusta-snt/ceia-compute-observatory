@@ -1,0 +1,15 @@
+.venv/
+node_modules/
+.next/
+__pycache__/
+*.db
+*.db-*
+.env
+*.egg-info/
+dist/
+.pytest_cache/
+*.tsbuildinfo
+.DS_Store
+.claude/
+.vscode/
+*.log

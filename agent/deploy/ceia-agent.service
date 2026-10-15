@@ -1,0 +1,28 @@
+[Unit]
+Description=CEIA Compute Observatory - agente de monitoramento
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ceia-agent
+Group=ceia-agent
+EnvironmentFile=/etc/ceia-compute-observatory/agent.env
+ExecStart=/opt/ceia-compute-observatory/venv/bin/ceia-agent
+Restart=always
+RestartSec=5
+StateDirectory=ceia-compute-observatory
+LogsDirectory=ceia-compute-observatory
+Nice=10
+IOSchedulingClass=idle
+# Endurecimento (o agente só lê /proc, /sys e executa nvidia-smi)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ceia-compute-observatory /var/log/ceia-compute-observatory
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

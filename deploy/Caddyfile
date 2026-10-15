@@ -1,0 +1,24 @@
+# Proxy reverso da plataforma central: uma única porta HTTP para dashboard + API.
+# Padrão SITE_ADDRESS=:80 → HTTP puro, sem domínio nem certificado (localhost ou IP da VPS).
+# Opcional: SITE_ADDRESS=monitor.exemplo.com faz o Caddy emitir HTTPS automaticamente.
+{$SITE_ADDRESS::80} {
+	encode gzip
+
+	# API (ingestão dos agentes, dashboard e o stream SSE) direto no backend.
+	# flush_interval -1: entrega os eventos SSE imediatamente, sem buffer.
+	handle /api/* {
+		reverse_proxy backend:8000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		-Server
+	}
+}
