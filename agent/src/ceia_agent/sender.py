@@ -43,7 +43,9 @@ class Sender:
             r = self.client.post(self.url, json=body)
         except httpx.HTTPError as e:
             return self._fail(f"rede: {e.__class__.__name__}: {e}")
-        if r.status_code in (200, 202):
+        # Só o 202 da rota de ingestão confirma: um 200 vem de algo no caminho (ex.: o Caddy da central já
+        # em HTTPS respondendo a http://IP) e confirmar descartaria as amostras sem gravá-las.
+        if r.status_code == 202:
             self.buffer.ack([s["ts"] for s in batch])
             self.failures = 0
             self.last_error = None

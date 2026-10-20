@@ -1,0 +1,7 @@
+# HTTPS: usado junto com docker-compose.yml quando SITE_ADDRESS é um domínio (scripts/compose.sh faz isso).
+# O Caddy emite e renova o certificado (Let's Encrypt) sozinho; a porta 80 continua para o desafio ACME e o redirecionamento.
+services:
+  caddy:
+    ports:
+      - "${BIND_ADDR:-0.0.0.0}:443:443"
+      - "${BIND_ADDR:-0.0.0.0}:443:443/udp"

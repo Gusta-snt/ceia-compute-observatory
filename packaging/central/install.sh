@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Instala/atualiza a plataforma central a partir deste pacote.
-# Uso: sudo ./install.sh [--prefix DIR] [--port 80] [--bind 0.0.0.0] [--site dominio]
+# Uso: sudo ./install.sh [--prefix DIR] [--port 80] [--bind 0.0.0.0] [--site dominio | --no-site]
+#   --site monitor.exemplo.com  HTTPS automático (Let's Encrypt): o domínio deve apontar para esta máquina
+#                               e as portas 80 e 443 precisam estar abertas.  --no-site volta para HTTP pelo IP.
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Execute como root (sudo)."; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREFIX=/opt/ceia-compute-observatory/central
-PORT=""; BIND=""; SITE=""
+PORT=""; BIND=""; SITE=""; NO_SITE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --prefix) PREFIX="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     --bind) BIND="$2"; shift 2 ;;
     --site) SITE="$2"; shift 2 ;;
+    --no-site) NO_SITE=1; shift ;;
     *) echo "argumento desconhecido: $1"; exit 2 ;;
   esac
 done
@@ -42,11 +45,22 @@ if [ ! -f "$ENV" ]; then
 fi
 [ -n "$PORT" ] && setkv HTTP_PORT "$PORT"
 [ -n "$BIND" ] && setkv BIND_ADDR "$BIND"
-[ -n "$SITE" ] && setkv SITE_ADDRESS "$SITE"
+if [ -n "$SITE" ]; then
+  SITE="${SITE#http://}"; SITE="${SITE#https://}"; SITE="${SITE%%/*}"
+  setkv SITE_ADDRESS "$SITE"; setkv COOKIE_SECURE true
+elif [ "$NO_SITE" -eq 1 ]; then
+  setkv SITE_ADDRESS ""; setkv COOKIE_SECURE false
+fi
+SITE="$(sed -n 's/^SITE_ADDRESS=//p' "$ENV" | tail -1)"
+case "$SITE" in :*) SITE="" ;; esac
+HTTP_PORT="$(sed -n 's/^HTTP_PORT=\([0-9]*\).*/\1/p' "$ENV")"
+if [ -n "$SITE" ] && [ "${HTTP_PORT:-80}" != 80 ]; then
+  echo "aviso: com HTTPS a porta HTTP deve ser 80 (emissão do certificado); HTTP_PORT=$HTTP_PORT"
+fi
 setkv APP_VERSION "$VERSION"
 chmod 600 "$ENV"
 
-COMPOSE=(docker compose -f "$PREFIX/deploy/docker-compose.yml" --env-file "$ENV")
+COMPOSE=("$PREFIX/scripts/compose.sh")
 if [ -f "$HERE/images/images.tar.gz" ]; then
   echo ">> Carregando imagens Docker do pacote..."
   docker load -i "$HERE/images/images.tar.gz"
@@ -56,13 +70,27 @@ else
   "${COMPOSE[@]}" up -d --build
 fi
 
-HTTP_PORT="$(sed -n 's/^HTTP_PORT=\([0-9]*\).*/\1/p' "$ENV")"
-URL="http://127.0.0.1:${HTTP_PORT:-80}/api/v1/health"
+BACKEND_PORT="$(sed -n 's/^BACKEND_PORT=\([0-9]*\).*/\1/p' "$ENV")"
+URL="http://127.0.0.1:${BACKEND_PORT:-8000}/api/v1/health"
+ok=0
 for _ in $(seq 60); do
-  if curl -fsS "$URL" >/dev/null 2>&1; then
-    echo "Central $VERSION no ar: http://<IP-desta-máquina>:${HTTP_PORT:-80}"
+  if curl -fsS "$URL" >/dev/null 2>&1; then ok=1; break; fi
+  sleep 2
+done
+[ "$ok" -eq 1 ] || { echo "A API não respondeu em $URL. Veja: ${COMPOSE[*]} logs backend"; exit 1; }
+if [ -z "$SITE" ]; then
+  echo "Central $VERSION no ar: http://<IP-desta-máquina>:${HTTP_PORT:-80}"
+  exit 0
+fi
+echo ">> Aguardando o certificado HTTPS de $SITE ..."
+for _ in $(seq 45); do
+  if curl -fsS --max-time 5 "https://$SITE/api/v1/health" >/dev/null 2>&1; then
+    echo "Central $VERSION no ar: https://$SITE"
     exit 0
   fi
   sleep 2
 done
-echo "A API não respondeu em $URL. Veja: ${COMPOSE[*]} logs backend"; exit 1
+echo "aviso: a central está rodando, mas https://$SITE ainda não respondeu com certificado válido."
+echo "  Confira se o DNS de $SITE aponta para esta máquina e se as portas 80 e 443 estão abertas no firewall."
+echo "  O Caddy tenta de novo sozinho; acompanhe com: ${COMPOSE[*]} logs -f caddy"
+exit 0

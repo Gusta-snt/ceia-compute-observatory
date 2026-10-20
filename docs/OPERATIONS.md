@@ -10,7 +10,7 @@
 | PSI "n/d" | Kernel sem `CONFIG_PSI` ou `psi=0`; o restante segue funcional. |
 | Buffer cheio | `BUFFER_MAX_SAMPLES` atingido; ajuste a política (`oldest`/`newest`). |
 
-**Upgrade do servidor:** `git pull && docker compose up -d --build`; as migrações rodam sozinhas. Faça backup antes (`scripts/backup-db.sh`).
+**Upgrade do servidor:** rode o instalador de novo (`install-central.sh`) ou `git pull && scripts/compose.sh up -d --build`; as migrações rodam sozinhas. Faça backup antes (`scripts/backup-db.sh`).
 **Rotação do SECRET_KEY:** invalida sessões de administrador; tokens de agente não são afetados.
-**Rede:** só o Caddy é exposto (`BIND_ADDR:HTTP_PORT`, HTTP). Bloqueie as demais portas no firewall da VPS (ex.: `ufw allow 22,80/tcp`). Sem TLS o token do agente e a sessão trafegam em texto claro; se precisar, use `SITE_ADDRESS=<domínio>` (HTTPS automático, abrir 443) e `COOKIE_SECURE=true`.
+**Rede:** só o Caddy é exposto (`BIND_ADDR:HTTP_PORT`, HTTP). Bloqueie as demais portas no firewall da VPS (ex.: `ufw allow 22,80,443/tcp`). Sem TLS o token do agente e a sessão trafegam em texto claro; use HTTPS: `install-central.sh --site <domínio>` (ou `SITE_ADDRESS=<domínio>` + `COOKIE_SECURE=true` no `.env` e `scripts/compose.sh up -d`). Com HTTPS sempre use `scripts/compose.sh` em vez de `docker compose` direto, senão a porta 443 deixa de ser publicada. Certificado não emitido: `scripts/compose.sh logs caddy` (DNS errado ou porta 80/443 fechada).
 **Privacidade:** o agente envia apenas métricas agregadas da máquina; coleta de processos de GPU não existe nesta versão.

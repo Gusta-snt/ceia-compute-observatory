@@ -13,6 +13,8 @@ const LABELS: Record<string, string> = {
   min_free_disk_gb: "Disco livre mínimo (GB)",
 };
 
+const AGENT_INSTALL_URL = "https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/agent/install.sh";
+
 export default function Admin() {
   const machines = useApi<any[]>("/machines?include_inactive=true", 60000, "all");
   const settings = useApi<any>("/settings");
@@ -33,6 +35,8 @@ export default function Admin() {
         <div role="alert" className="border border-amber-300 bg-amber-50 p-3 text-sm">
           Token de <b>{token.name}</b> (exibido uma única vez; copie agora e grave em <code>AGENT_TOKEN</code> no agente):
           <pre className="mt-2 overflow-x-auto bg-white p-2 font-mono text-xs">{token.value}</pre>
+          <p className="mt-3">Para instalar o agente, rode na máquina (Linux com internet). Se ela acessa a central por outro endereço, troque o <code>--url</code>:</p>
+          <pre className="mt-2 overflow-x-auto bg-white p-2 font-mono text-xs">{`curl -fsSL ${AGENT_INSTALL_URL} | sudo bash -s -- --url ${window.location.origin} --token ${token.value}`}</pre>
           <button className="mt-2 text-xs underline" onClick={() => setToken(null)}>Já copiei</button>
         </div>)}
 

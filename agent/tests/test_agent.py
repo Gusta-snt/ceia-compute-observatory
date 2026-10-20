@@ -113,6 +113,8 @@ def test_server_5xx_keeps_data_4xx_drops():
     buf = Buffer(":memory:"); buf.add({"ts": "a"})
     assert _sender(lambda r: httpx.Response(503), buf).flush_once() == 0 and buf.count() == 1
     assert _sender(lambda r: httpx.Response(401), buf).flush_once() == 0 and buf.count() == 1  # 401 mantém dados
+    assert _sender(lambda r: httpx.Response(200), buf).flush_once() == 0 and buf.count() == 1  # 200 vazio de proxy não confirma
+    assert _sender(lambda r: httpx.Response(308), buf).flush_once() == 0 and buf.count() == 1  # redirecionamento http->https
     assert _sender(lambda r: httpx.Response(422, text="bad"), buf).flush_once() == 0 and buf.count() == 0
 
 

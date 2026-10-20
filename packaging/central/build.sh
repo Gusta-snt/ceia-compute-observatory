@@ -32,7 +32,7 @@ mkdir -p "$STAGE" "$OUT"
 # Mesmo layout do repositório: o compose usa ../backend e ../frontend, e os scripts de
 # backup procuram ../deploy/docker-compose.yml. Só arquivos versionados (nada de .venv, node_modules, .env).
 ( cd "$ROOT" && git ls-files -z backend frontend deploy .env.example docs/OPERATIONS.md \
-    scripts/backup-db.sh scripts/restore-db.sh \
+    scripts/backup-db.sh scripts/restore-db.sh scripts/compose.sh \
   | grep -zv '^backend/tests/' | xargs -0 tar -cf - ) | tar -C "$STAGE" -xf -
 cp "$ROOT/packaging/central/install.sh" "$STAGE/"
 chmod +x "$STAGE"/install.sh "$STAGE"/scripts/*.sh

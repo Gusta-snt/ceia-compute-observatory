@@ -34,6 +34,16 @@ cd backend && .venv/bin/pytest ; cd ../agent && uv venv --python 3.13 && uv pip 
 
 Modo demonstração (dados sintéticos, identificado por selo): `DATABASE_URL=sqlite:///demo.db python ../scripts/seed_demo.py` a partir de `backend/`.
 
+## Instalação rápida da central (uma linha)
+
+Em um Linux com internet (VPS ou máquina local):
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/install-central.sh | sudo bash
+```
+Instala o Docker se faltar (script oficial `get.docker.com`, pede confirmação), baixa o código, pergunta o domínio, constrói e sobe a central em `/opt/ceia-compute-observatory/central`, e mostra o endereço do dashboard e a senha do admin (**uma única vez**).
+
+**HTTPS:** informe um domínio (ou `--site monitor.exemplo.com`) cujo registro DNS A aponte para a máquina, com as portas 80 e 443 abertas. O Caddy emite e renova o certificado Let's Encrypt sozinho, o instalador liga `COOKIE_SECURE` e confere o DNS (e libera 80/443 no `ufw`, se ativo). Sem domínio, a central fica em HTTP pelo IP (`--port` muda a porta). Uma central já instalada passa para HTTPS rodando o comando de novo com `--site` (ou volta com `--no-site`). Outras opções: `--bind`, `--prefix`, `--ref <branch/tag>`, `-y`. Rodar de novo atualiza e mantém `.env` e banco. Depois, **Administração → Cadastrar máquina** mostra o comando de uma linha para instalar o agente em cada Spark.
+
 ## Builds de distribuição (`packaging/`)
 
 ```bash
@@ -47,7 +57,7 @@ A versão da central é `backend/pyproject.toml` + commit (`1.0.0-3201a65`, com 
 
 ```bash
 tar xzf ceia-central-*.tar.gz && cd ceia-central-*
-sudo ./install.sh [--port 80] [--bind 0.0.0.0] [--site monitor.exemplo.com]
+sudo ./install.sh [--port 80] [--bind 0.0.0.0] [--site monitor.exemplo.com | --no-site]   # --site = HTTPS automático
 ```
 
 Instala em `/opt/ceia-compute-observatory/central` (`--prefix` muda). Na primeira vez gera o `.env` com segredos aleatórios e mostra a senha do admin **uma única vez**; nas atualizações mantém o `.env` e o banco (o projeto compose continua `deploy`, mesmos volumes), carrega as imagens do pacote se houver ou constrói, e espera `/api/v1/health` responder.
@@ -56,15 +66,22 @@ Instala em `/opt/ceia-compute-observatory/central` (`--prefix` muda). Na primeir
 
 ```bash
 cp .env.example .env     # defina POSTGRES_PASSWORD, SECRET_KEY, ADMIN_PASSWORD (BIND_ADDR/HTTP_PORT opcionais)
-cd deploy && docker compose --env-file ../.env up -d --build
-docker compose ps && curl http://localhost/api/v1/health
+scripts/compose.sh up -d --build      # = docker compose com deploy/docker-compose.yml (+ docker-compose.https.yml se houver domínio)
+scripts/compose.sh ps && curl http://localhost/api/v1/health
 ```
 
-Funciona igual em localhost ou numa VPS, sem domínio nem certificado: o Caddy (`deploy/Caddyfile`) publica dashboard + API numa única porta HTTP (`BIND_ADDR:HTTP_PORT`, padrão `0.0.0.0:80`); backend, frontend e banco não são expostos (backend/frontend só em `127.0.0.1` para diagnóstico). Dashboard em `http://localhost` ou `http://<IP-da-VPS>`; os agentes enviam para `http://<IP-da-VPS>/api/v1/ingest`. Não é necessária VPN: cada Spark só precisa alcançar essa porta. Sem TLS, o token do agente trafega em texto claro; para HTTPS no futuro basta `SITE_ADDRESS=<domínio>` e abrir a 443. As migrações rodam na inicialização do backend (`alembic upgrade head`); a hypertable TimescaleDB é criada automaticamente se a extensão existir.
+Funciona igual em localhost ou numa VPS, sem domínio nem certificado: o Caddy (`deploy/Caddyfile`) publica dashboard + API numa única porta HTTP (`BIND_ADDR:HTTP_PORT`, padrão `0.0.0.0:80`); backend, frontend e banco não são expostos (backend/frontend só em `127.0.0.1` para diagnóstico). Dashboard em `http://localhost` ou `http://<IP-da-VPS>`; os agentes enviam para `http://<IP-da-VPS>/api/v1/ingest`. Não é necessária VPN: cada Spark só precisa alcançar essa porta. Sem TLS, o token do agente trafega em texto claro; para HTTPS, `SITE_ADDRESS=<domínio>` e `COOKIE_SECURE=true` no `.env`, portas 80 e 443 abertas, e subir com `scripts/compose.sh` (que acrescenta `deploy/docker-compose.https.yml`, publicando a 443). As migrações rodam na inicialização do backend (`alembic upgrade head`); a hypertable TimescaleDB é criada automaticamente se a extensão existir.
 
 ## Cadastrar máquinas e instalar o agente
 
-**Pacote pronto (recomendado):** `packaging/build.sh agent` gera `dist/ceia-agent-<versão>-linux-aarch64.tar.gz` com o agente, as dependências ARM64 (instalação offline) e o instalador. Na Spark:
+**Instalação em uma linha (recomendado, precisa de internet na máquina):** no dashboard, **Administração → Cadastrar máquina** já mostra o comando com o token. Na máquina Linux:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/agent/install.sh \
+  | sudo bash -s -- --url http://<IP-da-central> --token ceia_agt_...
+```
+Sem `--url`/`--token` o script pergunta no terminal. Ele instala pré-requisitos (`python3-venv` via apt, se faltar), baixa o agente, cria/atualiza `/etc/ceia-compute-observatory/agent.env`, sobe o serviço e confirma o primeiro envio à central. Outras variáveis: `--interval 30`, `--set PROCESS_CMDLINE=false` (repetível, qualquer chave do `agent.env`), `--ref v1.1.0` (branch/tag), `-y` (sem perguntas). Rodar de novo atualiza o agente e mantém a configuração; `--uninstall` remove.
+
+**Pacote offline:** `packaging/build.sh agent` gera `dist/ceia-agent-<versão>-linux-aarch64.tar.gz` com o agente, as dependências ARM64 (instalação offline) e o instalador. Na Spark:
 ```bash
 tar xzf ceia-agent-*-linux-aarch64.tar.gz && cd ceia-agent-*-linux-aarch64
 sudo ./install.sh --url http://<IP-da-central> --token ceia_agt_...
