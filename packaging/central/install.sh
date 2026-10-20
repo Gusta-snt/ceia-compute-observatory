@@ -6,13 +6,16 @@
 #   --mode proxy   já existe um proxy com HTTPS nesta máquina (NetBird, Caddy, Nginx...): a central sobe só em HTTP
 #                  em BIND:PORT (padrão 127.0.0.1:8080) e o proxy encaminha --domain para ela. Com --proxy-network,
 #                  o Caddy da central entra nessa rede Docker como "ceia-observatory" (proxy rodando em container).
+#                  Proxy Traefik com provider Docker (ex.: NetBird): a rota para --domain é criada por labels no
+#                  container da central, sem editar o Traefik. Entrypoint/certresolver são lidos dos argumentos do
+#                  Traefik; --traefik-entrypoint e --traefik-certresolver forçam outros valores.
 #   --mode http    HTTP pelo IP, sem domínio (porta 80 ou --port).
 #   Sem --mode mantém o modo atual. Atalhos antigos: --site D = --mode https --domain D; --no-site = --mode http.
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Execute como root (sudo)."; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREFIX=/opt/ceia-compute-observatory/central
-PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""
+PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""; T_EP=""; T_CR=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --prefix) PREFIX="$2"; shift 2 ;;
@@ -21,6 +24,8 @@ while [ $# -gt 0 ]; do
     --mode) MODE="$2"; shift 2 ;;
     --domain) DOMAIN="$2"; shift 2 ;;
     --proxy-network) PROXY_NET="$2"; shift 2 ;;
+    --traefik-entrypoint) T_EP="$2"; shift 2 ;;
+    --traefik-certresolver) T_CR="$2"; shift 2 ;;
     --site) MODE=https; DOMAIN="$2"; shift 2 ;;
     --no-site) MODE=http; shift ;;
     *) echo "argumento desconhecido: $1"; exit 2 ;;
@@ -96,6 +101,41 @@ for p in $PORTS; do
     exit 1
   fi
 done
+
+# Proxy Traefik em container: rota por labels no Caddy da central (o Traefik descobre sozinho pelo provider Docker).
+TRAEFIK=0; PROXY_C=""
+if [ "$MODE" = proxy ] && [ -n "$PROXY_NET" ]; then
+  PROXY_C="$(docker ps --filter publish=443 --filter "network=$PROXY_NET" --format '{{.Names}}' | grep -v '^deploy-caddy' | head -1 || true)"
+fi
+if [ -n "$PROXY_C" ] && docker inspect -f '{{.Config.Image}}' "$PROXY_C" | grep -qi traefik; then
+  T_ARGS="$(docker inspect -f '{{range .Args}}{{println .}}{{end}}' "$PROXY_C")"
+  [ -n "$T_EP" ] || T_EP="$(getkv TRAEFIK_ENTRYPOINT)"
+  [ -n "$T_EP" ] || T_EP="$(printf '%s\n' "$T_ARGS" | sed -n -E 's/^--entry[pP]oints\.([^.]+)\.address=.*:443$/\1/p' | head -1)"
+  [ -n "$T_CR" ] || T_CR="$(getkv TRAEFIK_CERTRESOLVER)"
+  [ -n "$T_CR" ] || T_CR="$(printf '%s\n' "$T_ARGS" | sed -n -E 's/^--certificates[rR]esolvers\.([^.]+)\..*/\1/p' | head -1)"
+  if ! printf '%s\n' "$T_ARGS" | grep -qE '^--providers\.docker'; then
+    echo "aviso: o Traefik '$PROXY_C' não usa o provider Docker nos argumentos; a rota terá de ser criada à mão (veja o fim)."
+  elif [ -z "$DOMAIN" ] || [ -z "$T_EP" ]; then
+    echo "aviso: não deu para criar a rota no Traefik (domínio: ${DOMAIN:-?}, entrypoint 443: ${T_EP:-?}); use --domain e --traefik-entrypoint."
+  else
+    TRAEFIK=1
+    setkv TRAEFIK_ENTRYPOINT "$T_EP"; setkv TRAEFIK_CERTRESOLVER "$T_CR"
+    {
+      echo "# Gerado pelo install.sh (modo proxy com Traefik): rota $DOMAIN -> Caddy da central."
+      echo "services:"
+      echo "  caddy:"
+      echo "    labels:"
+      echo "      traefik.enable: \"true\""
+      echo "      traefik.docker.network: \"$PROXY_NET\""
+      echo "      traefik.http.routers.ceia-observatory.rule: \"Host(\`$DOMAIN\`)\""
+      echo "      traefik.http.routers.ceia-observatory.entrypoints: \"$T_EP\""
+      echo "      traefik.http.routers.ceia-observatory.tls: \"true\""
+      [ -z "$T_CR" ] || echo "      traefik.http.routers.ceia-observatory.tls.certresolver: \"$T_CR\""
+      echo "      traefik.http.services.ceia-observatory.loadbalancer.server.port: \"80\""
+    } > "$PREFIX/deploy/docker-compose.traefik.yml"
+  fi
+fi
+
 setkv APP_VERSION "$VERSION"
 chmod 600 "$ENV"
 
@@ -117,9 +157,21 @@ for _ in $(seq 60); do
   sleep 2
 done
 [ "$ok" -eq 1 ] || { echo "A API não respondeu em $URL. Veja: ${COMPOSE[*]} logs backend"; exit 1; }
+if [ "$MODE" = proxy ] && [ "$TRAEFIK" -eq 1 ]; then
+  echo "Central $VERSION no ar. Rota criada no Traefik '$PROXY_C' (entrypoint $T_EP${T_CR:+, certificado via $T_CR})."
+  echo ">> Aguardando https://$DOMAIN ..."
+  for _ in $(seq 45); do
+    if curl -fsS --max-time 5 "https://$DOMAIN/api/v1/health" >/dev/null 2>&1; then
+      echo "Central $VERSION no ar: https://$DOMAIN"; exit 0
+    fi
+    sleep 2
+  done
+  echo "aviso: https://$DOMAIN ainda não respondeu. Confira o DNS de $DOMAIN e os logs: docker logs $PROXY_C 2>&1 | tail -30"
+  exit 0
+fi
 if [ "$MODE" = proxy ]; then
   UP="127.0.0.1:$HTTP_PORT"; [ -z "$PROXY_NET" ] || UP="ceia-observatory:80"
-  PROXY_C="$(docker ps --filter "publish=443" ${PROXY_NET:+--filter "network=$PROXY_NET"} --format '{{.Names}}' | grep -v '^deploy-caddy' | head -1 || true)"
+  [ -n "$PROXY_C" ] || PROXY_C="$(docker ps --filter "publish=443" ${PROXY_NET:+--filter "network=$PROXY_NET"} --format '{{.Names}}' | grep -v '^deploy-caddy' | head -1 || true)"
   CFILE=""; [ -z "$PROXY_C" ] || CFILE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}' "$PROXY_C" 2>/dev/null || true)"
   echo "Central $VERSION no ar em http://$UP (atrás do seu proxy)."
   echo
@@ -131,6 +183,7 @@ if [ "$MODE" = proxy ]; then
   echo
   [ -z "$PROXY_C" ] || echo "e recarregue: docker exec $PROXY_C caddy reload --config /etc/caddy/Caddyfile"
   echo "(Nginx: proxy_pass http://$UP; com proxy_buffering off para o stream /api/v1/stream.)"
+  echo "(Traefik: router para Host(\`${DOMAIN:-dominio}\`) no entrypoint HTTPS apontando para http://$UP.)"
   [ -n "$DOMAIN" ] && curl -fsS --max-time 5 "https://$DOMAIN/api/v1/health" >/dev/null 2>&1 \
     && echo "https://$DOMAIN já está respondendo."
   exit 0

@@ -10,4 +10,5 @@ FILES=(-f "$ROOT/deploy/docker-compose.yml")
 SITE="$(sed -n 's/^SITE_ADDRESS=//p' "$ENV" | tail -1)"
 case "$SITE" in ""|:*) ;; *) FILES+=(-f "$ROOT/deploy/docker-compose.https.yml") ;; esac
 [ -z "$(sed -n 's/^PROXY_NETWORK=//p' "$ENV" | tail -1)" ] || FILES+=(-f "$ROOT/deploy/docker-compose.proxy.yml")
+[ ! -f "$ROOT/deploy/docker-compose.traefik.yml" ] || FILES+=(-f "$ROOT/deploy/docker-compose.traefik.yml")   # gerado pelo install.sh
 exec docker compose "${FILES[@]}" --env-file "$ENV" "$@"

@@ -47,14 +47,14 @@ Três modos (`--mode`, perguntado na 1ª instalação e mantido nas atualizaçõ
 | Modo | Quando usar | O que acontece |
 |---|---|---|
 | `https` | Máquina com 80/443 livres | O Caddy da central emite e renova o certificado Let's Encrypt para `--domain` (DNS A apontando para a máquina, portas 80/443 abertas). Liga `COOKIE_SECURE`, confere o DNS e libera 80/443 no `ufw`, se ativo. |
-| `proxy` | Já existe um proxy com HTTPS na máquina (ex.: **Caddy do NetBird**) | A central sobe só em HTTP em `127.0.0.1:8080` e **não toca** nas portas 80/443 nem no seu proxy. Se o proxy roda em container, a central entra na rede Docker dele como `ceia-observatory` (detectado sozinho). No fim o instalador mostra o bloco para colar no Caddyfile do proxy e o comando de reload. |
+| `proxy` | Já existe um proxy com HTTPS na máquina (ex.: **Caddy do NetBird**) | A central sobe só em HTTP em `127.0.0.1:8080` e **não toca** nas portas 80/443 nem no seu proxy. Se o proxy roda em container, a central entra na rede Docker dele como `ceia-observatory` (detectado sozinho). Se o proxy é **Traefik** com provider Docker (caso do NetBird), a rota é criada sozinha por labels no container da central (entrypoint e certresolver lidos do Traefik). Nos outros casos, o instalador mostra o bloco para colar no Caddyfile do proxy e o comando de reload. |
 | `http` | Sem domínio | HTTP pelo IP (`--port`, padrão 80). |
 
 Se as portas 80/443 já estiverem ocupadas, o instalador sugere o modo `proxy` (e recusa o `https`). Exemplo com o NetBird:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/install-central.sh \
   | sudo bash -s -- --mode proxy --domain monitor.exemplo.com
-# depois, no Caddyfile do NetBird:  monitor.exemplo.com { reverse_proxy ceia-observatory:80 }
+# NetBird com Traefik: nada a fazer depois. Com Caddy:  monitor.exemplo.com { reverse_proxy ceia-observatory:80 }
 ```
 Trocar de modo: rode de novo com outro `--mode`. Outras opções: `--port`, `--bind`, `--proxy-network <rede>`, `--prefix`, `--ref <branch/tag>`, `-y`. Rodar de novo atualiza e mantém `.env` e banco. Depois, **Administração → Cadastrar máquina** mostra o comando de uma linha para instalar o agente em cada Spark.
 
