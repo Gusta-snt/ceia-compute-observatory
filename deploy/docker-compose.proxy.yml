@@ -1,0 +1,14 @@
+# Modo proxy com o proxy existente em container (ex.: Caddy do NetBird): o Caddy da central entra na rede
+# Docker PROXY_NETWORK com o nome "ceia-observatory", e o proxy encaminha o domínio para ceia-observatory:80.
+# scripts/compose.sh inclui este arquivo quando PROXY_NETWORK está definido no .env.
+services:
+  caddy:
+    networks:
+      default: {}
+      proxy:
+        aliases: [ceia-observatory]
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:?defina PROXY_NETWORK}

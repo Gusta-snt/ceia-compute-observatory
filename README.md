@@ -40,9 +40,23 @@ Em um Linux com internet (VPS ou máquina local):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/install-central.sh | sudo bash
 ```
-Instala o Docker se faltar (script oficial `get.docker.com`, pede confirmação), baixa o código, pergunta o domínio, constrói e sobe a central em `/opt/ceia-compute-observatory/central`, e mostra o endereço do dashboard e a senha do admin (**uma única vez**).
+Instala o Docker se faltar (script oficial `get.docker.com`, pede confirmação), baixa o código, pergunta como a central será acessada, constrói e sobe a central em `/opt/ceia-compute-observatory/central`, e mostra o endereço do dashboard e a senha do admin (**uma única vez**).
 
-**HTTPS:** informe um domínio (ou `--site monitor.exemplo.com`) cujo registro DNS A aponte para a máquina, com as portas 80 e 443 abertas. O Caddy emite e renova o certificado Let's Encrypt sozinho, o instalador liga `COOKIE_SECURE` e confere o DNS (e libera 80/443 no `ufw`, se ativo). Sem domínio, a central fica em HTTP pelo IP (`--port` muda a porta). Uma central já instalada passa para HTTPS rodando o comando de novo com `--site` (ou volta com `--no-site`). Outras opções: `--bind`, `--prefix`, `--ref <branch/tag>`, `-y`. Rodar de novo atualiza e mantém `.env` e banco. Depois, **Administração → Cadastrar máquina** mostra o comando de uma linha para instalar o agente em cada Spark.
+Três modos (`--mode`, perguntado na 1ª instalação e mantido nas atualizações):
+
+| Modo | Quando usar | O que acontece |
+|---|---|---|
+| `https` | Máquina com 80/443 livres | O Caddy da central emite e renova o certificado Let's Encrypt para `--domain` (DNS A apontando para a máquina, portas 80/443 abertas). Liga `COOKIE_SECURE`, confere o DNS e libera 80/443 no `ufw`, se ativo. |
+| `proxy` | Já existe um proxy com HTTPS na máquina (ex.: **Caddy do NetBird**) | A central sobe só em HTTP em `127.0.0.1:8080` e **não toca** nas portas 80/443 nem no seu proxy. Se o proxy roda em container, a central entra na rede Docker dele como `ceia-observatory` (detectado sozinho). No fim o instalador mostra o bloco para colar no Caddyfile do proxy e o comando de reload. |
+| `http` | Sem domínio | HTTP pelo IP (`--port`, padrão 80). |
+
+Se as portas 80/443 já estiverem ocupadas, o instalador sugere o modo `proxy` (e recusa o `https`). Exemplo com o NetBird:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/install-central.sh \
+  | sudo bash -s -- --mode proxy --domain monitor.exemplo.com
+# depois, no Caddyfile do NetBird:  monitor.exemplo.com { reverse_proxy ceia-observatory:80 }
+```
+Trocar de modo: rode de novo com outro `--mode`. Outras opções: `--port`, `--bind`, `--proxy-network <rede>`, `--prefix`, `--ref <branch/tag>`, `-y`. Rodar de novo atualiza e mantém `.env` e banco. Depois, **Administração → Cadastrar máquina** mostra o comando de uma linha para instalar o agente em cada Spark.
 
 ## Builds de distribuição (`packaging/`)
 
@@ -57,7 +71,7 @@ A versão da central é `backend/pyproject.toml` + commit (`1.0.0-3201a65`, com 
 
 ```bash
 tar xzf ceia-central-*.tar.gz && cd ceia-central-*
-sudo ./install.sh [--port 80] [--bind 0.0.0.0] [--site monitor.exemplo.com | --no-site]   # --site = HTTPS automático
+sudo ./install.sh [--mode https|proxy|http] [--domain monitor.exemplo.com] [--port 80] [--bind 0.0.0.0] [--proxy-network rede]
 ```
 
 Instala em `/opt/ceia-compute-observatory/central` (`--prefix` muda). Na primeira vez gera o `.env` com segredos aleatórios e mostra a senha do admin **uma única vez**; nas atualizações mantém o `.env` e o banco (o projeto compose continua `deploy`, mesmos volumes), carrega as imagens do pacote se houver ou constrói, e espera `/api/v1/health` responder.
