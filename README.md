@@ -58,6 +58,15 @@ curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/
 ```
 Trocar de modo: rode de novo com outro `--mode`. Outras opções: `--port`, `--bind`, `--proxy-network <rede>`, `--prefix`, `--ref <branch/tag>`, `-y`. Rodar de novo atualiza e mantém `.env` e banco. Depois, **Administração → Cadastrar máquina** mostra o comando de uma linha para instalar o agente em cada Spark.
 
+### Central só na rede interna (ex.: numa das Sparks)
+
+Para a central não ficar acessível de fora, escute só no IP da rede local e libere apenas as Sparks:
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/install-central.sh \
+  | sudo bash -s -- --mode http --bind 172.16.3.95 --allow 172.16.3.10,172.16.3.11,172.16.3.12
+```
+`--allow` aceita IPs e redes CIDR, exige `--bind` com um IP específico e é mantido nas atualizações (`--allow none` remove). O filtro fica no iptables (cadeia `CEIA-OBS` chamada pela `DOCKER-USER`), porque o Docker ignora o `ufw` nas portas publicadas; um drop-in do `docker.service` o reaplica a cada boot. Conexões da própria máquina não passam pelo filtro: o agente local usa `--url http://172.16.3.95`, e o dashboard pode ser aberto de fora da lista por túnel SSH (`ssh -L 8080:172.16.3.95:80 <spark-central>` → `http://localhost:8080`). Conferir: `sudo iptables -S CEIA-OBS` e `sudo ss -tlnp | grep ':80 '`.
+
 ## Builds de distribuição (`packaging/`)
 
 ```bash

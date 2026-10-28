@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Instala/atualiza a plataforma central a partir deste pacote.
-# Uso: sudo ./install.sh [--mode https|proxy|http] [--domain D] [--port P] [--bind IP] [--proxy-network REDE] [--prefix DIR]
+# Uso: sudo ./install.sh [--mode https|proxy|http] [--domain D] [--port P] [--bind IP] [--allow IPS] [--proxy-network REDE] [--prefix DIR]
 #   --mode https   o Caddy da central emite o certificado (Let's Encrypt) para --domain; precisa das portas 80 e 443
 #                  livres e do DNS do domínio apontando para esta máquina.
 #   --mode proxy   já existe um proxy com HTTPS nesta máquina (NetBird, Caddy, Nginx...): a central sobe só em HTTP
@@ -10,17 +10,20 @@
 #                  container da central, sem editar o Traefik. Entrypoint/certresolver são lidos dos argumentos do
 #                  Traefik; --traefik-entrypoint e --traefik-certresolver forçam outros valores.
 #   --mode http    HTTP pelo IP, sem domínio (porta 80 ou --port).
+#   --allow LISTA  só estes IPs/redes (ex.: 172.16.3.10,172.16.3.11 ou 172.16.3.0/24) alcançam a porta da central;
+#                  exige --bind com um IP específico. Mantido nas atualizações; --allow none remove o filtro.
 #   Sem --mode mantém o modo atual. Atalhos antigos: --site D = --mode https --domain D; --no-site = --mode http.
 set -euo pipefail
 [ "$(id -u)" -eq 0 ] || { echo "Execute como root (sudo)."; exit 1; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 PREFIX=/opt/ceia-compute-observatory/central
-PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""; T_EP=""; T_CR=""
+PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""; T_EP=""; T_CR=""; ALLOW=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --prefix) PREFIX="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
     --bind) BIND="$2"; shift 2 ;;
+    --allow) ALLOW="$2"; shift 2 ;;
     --mode) MODE="$2"; shift 2 ;;
     --domain) DOMAIN="$2"; shift 2 ;;
     --proxy-network) PROXY_NET="$2"; shift 2 ;;
@@ -84,6 +87,23 @@ fi
 [ -z "$MODE" ] || setkv CENTRAL_MODE "$MODE"
 MODE="$(getkv CENTRAL_MODE)"; SITE="$(getkv SITE_ADDRESS)"; DOMAIN="$(getkv PUBLIC_DOMAIN)"; PROXY_NET="$(getkv PROXY_NETWORK)"
 HTTP_PORT="$(getkv HTTP_PORT)"; HTTP_PORT="${HTTP_PORT:-80}"
+
+# Filtro de origem (scripts/firewall.sh): sem --allow mantém o da instalação anterior.
+case "$ALLOW" in
+  "") ;;
+  none) setkv ALLOW_FROM "" ;;
+  *) for a in ${ALLOW//,/ }; do
+       [[ "$a" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/[0-9]{1,2})?$ ]] || { echo "--allow: endereço inválido '$a' (use IPv4 ou CIDR)"; exit 2; }
+     done
+     setkv ALLOW_FROM "$ALLOW" ;;
+esac
+ALLOW="$(getkv ALLOW_FROM)"; BIND_ADDR="$(getkv BIND_ADDR)"
+if [ -n "$ALLOW" ]; then
+  # Em 0.0.0.0 o Docker publica também em IPv6, que o filtro (iptables) não cobre.
+  case "$BIND_ADDR" in ""|0.0.0.0|::) echo "--allow exige --bind com o IP específico desta máquina (ex.: --bind 172.16.3.95)"; exit 2 ;; esac
+  [ "$MODE" != https ] || { echo "--allow não combina com --mode https (o Let's Encrypt precisa alcançar a porta 80)"; exit 2; }
+  command -v iptables >/dev/null || { echo "--allow precisa do iptables"; exit 1; }
+fi
 [ -z "$PROXY_NET" ] || docker network inspect "$PROXY_NET" >/dev/null 2>&1 \
   || { echo "rede Docker '$PROXY_NET' não existe (docker network ls)"; exit 1; }
 
@@ -139,6 +159,19 @@ fi
 setkv APP_VERSION "$VERSION"
 chmod 600 "$ENV"
 
+# O drop-in reaplica o filtro antes e depois de cada início do Docker (boot, restart); falha nele não impede o Docker.
+DROPIN=/etc/systemd/system/docker.service.d/ceia-observatory-firewall.conf
+if [ -n "$ALLOW" ]; then
+  mkdir -p "$(dirname "$DROPIN")"
+  printf '[Service]\nExecStartPre=-%s %s\nExecStartPost=-%s %s\n' \
+    "$PREFIX/scripts/firewall.sh" "$ENV" "$PREFIX/scripts/firewall.sh" "$ENV" > "$DROPIN"
+  systemctl daemon-reload
+  "$PREFIX/scripts/firewall.sh" "$ENV"
+elif [ -f "$DROPIN" ]; then
+  rm -f "$DROPIN"; systemctl daemon-reload
+  "$PREFIX/scripts/firewall.sh" --clear
+fi
+
 COMPOSE=("$PREFIX/scripts/compose.sh")
 if [ -f "$HERE/images/images.tar.gz" ]; then
   echo ">> Carregando imagens Docker do pacote..."
@@ -189,7 +222,8 @@ if [ "$MODE" = proxy ]; then
   exit 0
 fi
 if [ -z "$SITE" ]; then
-  echo "Central $VERSION no ar: http://<IP-desta-máquina>:${HTTP_PORT:-80}"
+  H="$BIND_ADDR"; case "$H" in ""|0.0.0.0) H="<IP-desta-máquina>" ;; esac
+  echo "Central $VERSION no ar: http://$H:${HTTP_PORT:-80}${ALLOW:+  (aceita conexões só de: $ALLOW)}"
   exit 0
 fi
 echo ">> Aguardando o certificado HTTPS de $SITE ..."

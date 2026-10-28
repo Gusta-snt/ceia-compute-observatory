@@ -17,6 +17,8 @@
 #   --port PORTA         porta HTTP da central (modo http: 80; modo proxy: 8080 local)
 #   --proxy-network REDE modo proxy: rede Docker do proxy existente (detectada sozinha se ele roda em container)
 #   --bind ENDERECO      endereço de escuta (http/https: 0.0.0.0; proxy: 127.0.0.1)
+#   --allow LISTA        só estes IPs/redes alcançam a central (ex.: 172.16.3.10,172.16.3.11); exige --bind <IP>.
+#                        Mantido nas atualizações; --allow none remove o filtro
 #   --prefix DIR         diretório de instalação (padrão /opt/ceia-compute-observatory/central)
 #   --ref REF            branch/tag do repositório a instalar (padrão main)
 #   -y, --yes            não pergunta nada (instala o Docker sem confirmar, se faltar)
@@ -24,7 +26,7 @@ set -euo pipefail
 
 REPO="${CEIA_REPO:-Gusta-snt/ceia-compute-observatory}"
 REF="main"; PREFIX=/opt/ceia-compute-observatory/central
-PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""; YES=0
+PORT=""; BIND=""; MODE=""; DOMAIN=""; PROXY_NET=""; ALLOW=""; YES=0
 
 say() { printf '\033[1;34m>>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merro:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -38,6 +40,7 @@ while [ $# -gt 0 ]; do
     --no-site) MODE=http; shift ;;
     --port) PORT="$2"; shift 2 ;;
     --bind) BIND="$2"; shift 2 ;;
+    --allow) ALLOW="$2"; shift 2 ;;
     --prefix) PREFIX="$2"; shift 2 ;;
     --ref) REF="$2"; shift 2 ;;
     -y|--yes) YES=1; shift ;;
@@ -160,6 +163,7 @@ echo "$BASE_VERSION-${SHA:0:7}" | sed 's/-$//' > "$TMP/VERSION"
 ARGS=(--prefix "$PREFIX")
 [ -z "$PORT" ] || ARGS+=(--port "$PORT")
 [ -z "$BIND" ] || ARGS+=(--bind "$BIND")
+[ -z "$ALLOW" ] || ARGS+=(--allow "$ALLOW")
 [ -z "$MODE" ] || ARGS+=(--mode "$MODE")
 [ -z "$DOMAIN" ] || ARGS+=(--domain "$DOMAIN")
 [ -z "$PROXY_NET" ] || ARGS+=(--proxy-network "$PROXY_NET")
@@ -171,7 +175,8 @@ bash "$TMP/install.sh" "${ARGS[@]}"
 P="$(sed -n 's/^HTTP_PORT=\([0-9]*\).*/\1/p' "$PREFIX/.env")"; P="${P:-80}"
 M="$(sed -n 's/^CENTRAL_MODE=//p' "$PREFIX/.env" | tail -1)"
 D="$(sed -n 's/^PUBLIC_DOMAIN=//p' "$PREFIX/.env" | tail -1)"
-IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+IP="$(sed -n 's/^BIND_ADDR=//p' "$PREFIX/.env" | tail -1)"
+case "$IP" in ""|0.0.0.0|127.0.0.1) IP="$(hostname -I 2>/dev/null | awk '{print $1}')" ;; esac
 if [ "$M" != http ] && [ -n "$D" ]; then ADDR="https://$D"; else ADDR="http://${IP:-<IP-desta-máquina>}$([ "$P" = 80 ] || echo ":$P")"; fi
 echo
 if [[ "$ADDR" == https://* ]] && ! curl -fsS --max-time 5 "$ADDR/api/v1/health" >/dev/null 2>&1; then
