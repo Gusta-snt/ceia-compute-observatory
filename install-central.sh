@@ -174,6 +174,10 @@ D="$(sed -n 's/^PUBLIC_DOMAIN=//p' "$PREFIX/.env" | tail -1)"
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 if [ "$M" != http ] && [ -n "$D" ]; then ADDR="https://$D"; else ADDR="http://${IP:-<IP-desta-máquina>}$([ "$P" = 80 ] || echo ":$P")"; fi
 echo
-say "Dashboard: $ADDR   (usuário admin)"
+if [[ "$ADDR" == https://* ]] && ! curl -fsS --max-time 5 "$ADDR/api/v1/health" >/dev/null 2>&1; then
+  say "Dashboard (quando o proxy encaminhar o domínio): $ADDR   (usuário admin)"
+else
+  say "Dashboard: $ADDR   (usuário admin)"
+fi
 echo "   Próximo passo: Administração -> Cadastrar máquina mostra o comando de instalação do agente."
 echo "   Atualizar: rode este mesmo comando de novo.   Backup: sudo $PREFIX/scripts/backup-db.sh /var/backups/ceia"
