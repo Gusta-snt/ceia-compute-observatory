@@ -67,6 +67,15 @@ curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/
 ```
 `--allow` aceita IPs e redes CIDR, exige `--bind` com um IP específico e é mantido nas atualizações (`--allow none` remove). O filtro fica no iptables (cadeia `CEIA-OBS` chamada pela `DOCKER-USER`), porque o Docker ignora o `ufw` nas portas publicadas; um drop-in do `docker.service` o reaplica a cada boot. Conexões da própria máquina não passam pelo filtro: o agente local usa `--url http://172.16.3.95`, e o dashboard pode ser aberto de fora da lista por túnel SSH (`ssh -L 8080:172.16.3.95:80 <spark-central>` → `http://localhost:8080`). Conferir: `sudo iptables -S CEIA-OBS` e `sudo ss -tlnp | grep ':80 '`.
 
+## Atualizar central e agente (um comando)
+
+Em qualquer máquina já instalada (central, Spark com agente, ou as duas coisas na mesma):
+```bash
+curl -fsSL https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/update.sh | sudo bash
+sudo ceia-update            # nas próximas vezes (o comando fica em /usr/local/bin)
+```
+O script detecta sozinho o que existe na máquina e atualiza só isso, mantendo `.env`, banco, modo/domínio/filtro da central e `agent.env` + buffer do agente. Na central faz antes um backup do banco em `<prefixo>/backups` e pula a reinstalação se ela já estiver no commit mais recente. Opções: `--check` (só compara versões), `--central-only`, `--agent-only`, `--force` (reinstala a central), `--ref <branch/tag>`, `--prefix`. Cada Spark precisa rodar o comando uma vez; o script não acessa outras máquinas.
+
 ## Builds de distribuição (`packaging/`)
 
 ```bash
