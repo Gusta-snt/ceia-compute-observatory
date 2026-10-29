@@ -88,7 +88,7 @@ export default function MachinePage() {
           <h1 className="text-xl font-medium text-navy-900">{d.name}</h1>
           <p className="text-sm text-mute">{[d.hostname, d.address, d.system?.gpu_name ?? d.hardware].filter(Boolean).join(" · ")}</p>
         </div>
-        <div className="flex items-center gap-3"><StatusBadge status={d.status} /><span className="text-xs text-mute">última comunicação {ago(d.last_seen)}</span>
+        <div className="flex flex-wrap items-center gap-3"><StatusBadge status={d.status} /><span className="text-xs text-mute">última comunicação {ago(d.last_seen)}</span>
           <Segmented label="Intervalo" value={range} onChange={setRange} options={RANGES as any} /></div>
       </header>
 

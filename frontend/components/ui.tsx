@@ -4,11 +4,11 @@ import { STATUS_LABEL } from "@/lib/api";
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`border border-line bg-white transition-[border-color,box-shadow] duration-200 hover:border-slate-300 hover:shadow-[0_2px_10px_-6px_rgba(2,48,72,.25)] ${className}`}>
+    <section className={`border border-line bg-white ${className}`}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-medium text-navy-900">{title}</h2>
-          <div className="flex items-center gap-2">{actions}</div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </header>
       )}
       <div className="p-4">{children}</div>
@@ -40,8 +40,7 @@ export function CountUp({ value, ms = 600 }: { value: number; ms?: number }) {
 
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "warn" | "ok" }) {
   return (
-    <div className="group relative overflow-hidden border border-line bg-white px-4 py-3 transition-[border-color,transform] duration-200 hover:-translate-y-px hover:border-slate-300">
-      <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-brand transition-transform duration-300 group-hover:scale-x-100" />
+    <div className="border border-line bg-white px-4 py-3">
       <div className="text-xs uppercase tracking-wide text-mute">{label}</div>
       <div className={`num mt-1 text-2xl font-medium transition-colors duration-300 ${tone === "warn" ? "text-amber-700" : "text-navy-900"}`}>
         {typeof value === "number" ? <CountUp value={value} /> : <span key={String(value)} className="anim-tick inline-block">{value}</span>}
@@ -61,7 +60,7 @@ const STATUS_DOT: Record<string, string> = { online: "bg-emerald-500", sem_comun
 export function StatusBadge({ status }: { status: string }) {
   const dot = STATUS_DOT[status] ?? "bg-slate-400";
   return (
-    <span className={`inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs transition-colors duration-300 ${STATUS_STYLE[status] ?? STATUS_STYLE.dados_insuficientes}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap border px-2 py-0.5 text-xs transition-colors duration-300 ${STATUS_STYLE[status] ?? STATUS_STYLE.dados_insuficientes}`}>
       <span aria-hidden className="relative flex h-1.5 w-1.5">
         {status === "online" && <span className={`ping-soft absolute inset-0 rounded-full ${dot}`} />}
         <span className={`relative h-1.5 w-1.5 rounded-full ${dot}`} />
@@ -79,7 +78,7 @@ const CLASS_STYLE: Record<string, string> = {
   insuficiente: "bg-slate-100 text-slate-700 border-slate-300",
 };
 export function ClassBadge({ k, label }: { k: string; label: string }) {
-  return <span className={`inline-block border px-2 py-0.5 text-xs transition-colors duration-300 ${CLASS_STYLE[k] ?? CLASS_STYLE.insuficiente}`}>{label}</span>;
+  return <span className={`inline-block whitespace-nowrap border px-2 py-0.5 text-xs transition-colors duration-300 ${CLASS_STYLE[k] ?? CLASS_STYLE.insuficiente}`}>{label}</span>;
 }
 
 export function Loading({ label = "Carregando…" }: { label?: string }) {
@@ -92,14 +91,14 @@ export function Loading({ label = "Carregando…" }: { label?: string }) {
 }
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="anim-rise border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div role="alert" className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
       {message}
       {onRetry && <button onClick={onRetry} className="ml-3 underline transition-colors hover:text-red-950">Tentar novamente</button>}
     </div>
   );
 }
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="anim-fade border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-mute">{children}</div>;
+  return <div className="border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-mute">{children}</div>;
 }
 
 export function Bar({ value, tone = "brand" }: { value: number | null | undefined; tone?: "brand" | "warn" }) {
@@ -107,10 +106,10 @@ export function Bar({ value, tone = "brand" }: { value: number | null | undefine
   const v = Math.max(0, Math.min(100, value));
   return (
     <div className="flex items-center gap-2" aria-label={`${v.toFixed(0)}%`}>
-      <div className="h-1.5 w-20 overflow-hidden bg-slate-200">
+      <div className="h-1.5 w-16 overflow-hidden bg-slate-200">
         <div className={`anim-grow h-full transition-[width,background-color] duration-700 ease-out ${v >= 90 ? "bg-red-600" : tone === "warn" ? "bg-amber-500" : "bg-brand"}`} style={{ width: `${v}%` }} />
       </div>
-      <span className="num w-10 text-right text-xs">{v.toFixed(0)}%</span>
+      <span className="num w-8 text-right text-xs">{v.toFixed(0)}%</span>
     </div>
   );
 }
@@ -120,7 +119,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
     <div role="group" aria-label={label} className="inline-flex border border-line">
       {options.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)} aria-pressed={v === value}
-          className={`px-2.5 py-1 text-xs transition-colors duration-200 ${v === value ? "bg-navy-900 text-white" : "bg-white text-ink hover:bg-slate-100"}`}>{l}</button>
+          className={`whitespace-nowrap px-2.5 py-1 text-xs transition-colors duration-200 ${v === value ? "bg-navy-900 text-white" : "bg-white text-ink hover:bg-slate-100"}`}>{l}</button>
       ))}
     </div>
   );

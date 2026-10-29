@@ -52,7 +52,7 @@ export function Heatmap({ grid, unit = "%" }: { grid: (number | null)[][]; unit?
   const color = (v: number | null) => (v == null ? "#eef1f4" : `rgba(35,117,228,${0.12 + Math.min(1, v / 100) * 0.88})`);
   return (
     <div className="overflow-x-auto">
-      <table className="border-separate border-spacing-0.5 text-[10px]" aria-label="Mapa de calor por dia da semana e hora">
+      <table className="heat border-separate border-spacing-0.5 text-[10px]" aria-label="Mapa de calor por dia da semana e hora">
         <thead><tr><th />{Array.from({ length: 24 }, (_, h) => <th key={h} className="w-6 font-normal text-mute">{h}</th>)}</tr></thead>
         <tbody>
           {grid.map((row, d) => (
@@ -60,8 +60,8 @@ export function Heatmap({ grid, unit = "%" }: { grid: (number | null)[][]; unit?
               <th className="pr-2 text-right font-normal text-mute">{DAYS[d]}</th>
               {row.map((v, h) => (
                 <td key={h} title={`${DAYS[d]} ${h}h: ${v == null ? "sem dados" : v.toFixed(1) + unit}`}
-                  className="anim-fade h-6 w-6 transition-[transform,box-shadow] duration-150 hover:relative hover:z-10 hover:scale-125 hover:shadow-[0_0_0_1px_#023048]"
-                  style={{ background: color(v), ["--i" as any]: h + d * 2 }} />
+                  className="h-6 w-6 transition-transform duration-150 hover:relative hover:z-10 hover:scale-125 hover:outline hover:outline-1 hover:outline-navy-900"
+                  style={{ background: color(v) }} />
               ))}
             </tr>
           ))}

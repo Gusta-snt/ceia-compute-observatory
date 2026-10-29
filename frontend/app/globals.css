@@ -7,43 +7,41 @@ body { @apply bg-paper text-ink antialiased; }
 :focus-visible { outline: 2px solid #2375e4; outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 
+/* ---------------------------------------------------------------- superfícies do navegador */
+::selection { background: rgba(35, 117, 228, .18); color: #023048; }
+html { accent-color: #2375e4; caret-color: #2375e4; scrollbar-color: #c3ccd5 transparent; }
+a { text-underline-offset: 3px; }
+
+/* Tabelas de dados: mesmo respiro em todas as páginas e numerais tabulares. */
+main table:not(.heat) th { padding: .25rem .625rem .375rem 0; font-weight: 500; white-space: nowrap; }
+main table:not(.heat) td { padding: .5rem .625rem .5rem 0; font-variant-numeric: tabular-nums; }
+main table:not(.heat) :is(th, td):last-child { padding-right: 0; }
+main table:not(.heat) tbody tr { transition: background-color .15s ease; }
+main table:not(.heat) tbody tr:hover { background-color: #f6f9fc; }
+
 /* ---------------------------------------------------------------- movimento
-   Entradas curtas (≤ 500 ms) e só na montagem: as atualizações ao vivo (SSE a cada 5 s) mantêm as mesmas
-   chaves React, então linhas e cartões já montados não animam de novo. */
-@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+   Um momento só: a página assenta, os indicadores entram em sequência, barras crescem e as linhas do
+   gráfico são desenhadas. Tudo parte de um estado já visível e só na montagem: as atualizações ao vivo
+   (SSE a cada 5 s) mantêm as chaves React, então o que já está na tela não anima de novo. */
+@keyframes rise { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: .35; } to { opacity: 1; } }
 @keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @keyframes ping-soft { 0% { transform: scale(1); opacity: .55; } 80%, 100% { transform: scale(2.4); opacity: 0; } }
 @keyframes drift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 
-@keyframes tick { from { opacity: .35; } to { opacity: 1; } }
-.anim-tick { animation: tick .5s ease-out backwards; }
-.anim-rise { animation: rise .42s cubic-bezier(.2, .7, .3, 1) backwards; animation-delay: calc(var(--i, 0) * 45ms); }
-.anim-fade { animation: fade .35s ease-out backwards; animation-delay: calc(var(--i, 0) * 12ms); }
-.anim-grow { transform-origin: left; animation: grow-x .7s cubic-bezier(.2, .7, .3, 1) backwards; }
+.anim-tick { animation: fade .5s cubic-bezier(.16, 1, .3, 1) backwards; }
+.anim-rise { animation: rise .4s cubic-bezier(.16, 1, .3, 1) backwards; }
+.anim-fade { animation: fade .3s ease-out backwards; }
+.anim-grow { transform-origin: left; animation: grow-x .7s cubic-bezier(.16, 1, .3, 1) backwards; }
+.page { animation: rise .35s cubic-bezier(.16, 1, .3, 1) backwards; }
 
-/* Páginas: cada filho direto do conteúdo entra em cascata (cabeçalho, indicadores, cartões). */
-.page > * { animation: rise .45s cubic-bezier(.2, .7, .3, 1) backwards; }
-.page > *:nth-child(2) { animation-delay: 60ms; }
-.page > *:nth-child(3) { animation-delay: 120ms; }
-.page > *:nth-child(4) { animation-delay: 180ms; }
-.page > *:nth-child(n+5) { animation-delay: 240ms; }
-
-/* Grades de indicadores: cada item entra um pouco depois do anterior. */
-.stagger > * { animation: rise .4s cubic-bezier(.2, .7, .3, 1) backwards; }
+/* Indicadores: cada um entra 40 ms depois do anterior. */
+.stagger > * { animation: rise .5s cubic-bezier(.16, 1, .3, 1) backwards; }
 .stagger > *:nth-child(2) { animation-delay: 40ms; } .stagger > *:nth-child(3) { animation-delay: 80ms; }
 .stagger > *:nth-child(4) { animation-delay: 120ms; } .stagger > *:nth-child(5) { animation-delay: 160ms; }
 .stagger > *:nth-child(6) { animation-delay: 200ms; } .stagger > *:nth-child(7) { animation-delay: 240ms; }
 .stagger > *:nth-child(n+8) { animation-delay: 280ms; }
-
-/* Tabelas: linhas entram em cascata curta e destacam no hover. */
-main tbody tr { animation: fade .35s ease-out backwards; transition: background-color .15s ease; }
-main tbody tr:nth-child(2) { animation-delay: 30ms; } main tbody tr:nth-child(3) { animation-delay: 60ms; }
-main tbody tr:nth-child(4) { animation-delay: 90ms; } main tbody tr:nth-child(5) { animation-delay: 120ms; }
-main tbody tr:nth-child(n+6) { animation-delay: 150ms; }
-main tbody tr:hover { background-color: #f6f9fc; }
-main table[aria-label^="Mapa de calor"] tr:hover { background-color: transparent; }
 
 .skeleton {
   background: linear-gradient(90deg, #e9eef2 25%, #f5f8fa 50%, #e9eef2 75%);

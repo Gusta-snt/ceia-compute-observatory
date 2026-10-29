@@ -32,7 +32,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="px-4 pb-1 pt-4">
           <div className="flex items-center gap-2 text-sm font-medium"><Activity size={16} className="text-cyan-brand" aria-hidden />{brand.name}</div>
-          {brand.demo_mode && <div className="anim-fade mt-2 border border-amber-300 px-2 py-0.5 text-xs text-amber-200">MODO DEMONSTRAÇÃO</div>}
+          {brand.demo_mode && <div className="mt-2 border border-amber-300 px-2 py-0.5 text-xs text-amber-200">MODO DEMONSTRAÇÃO</div>}
         </div>
         <nav aria-label="Principal" className="flex flex-row gap-1 overflow-x-auto px-2 py-3 md:flex-col">
           {NAV.map(({ href, label, icon: I }) => {
@@ -50,7 +50,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={brand.ufg_logo} alt="Universidade Federal de Goiás" className="h-12 w-auto" />
           {user && (
-            <button className="anim-fade flex items-center gap-1 text-xs text-slate-300 transition-colors hover:text-white"
+            <button className="flex items-center gap-1 text-xs text-slate-300 transition-colors hover:text-white"
               onClick={async () => { await api("/auth/logout", { method: "POST" }); router.push("/login"); }}>
               <LogOut size={12} aria-hidden /> Sair ({user})
             </button>

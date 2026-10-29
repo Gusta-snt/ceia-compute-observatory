@@ -56,7 +56,7 @@ export default function Overview() {
 
       {ov.loading && !ov.data ? <Loading /> : ov.error ? <ErrorBox message={ov.error} onRetry={ov.reload} /> : t && (
         <>
-          <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+          <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-8">
             <Stat label="Sparks" value={t.machines} />
             <Stat label="Online" value={t.online} hint={t.sem_comunicacao ? `${t.sem_comunicacao} sem comunicação` : undefined} tone={t.sem_comunicacao ? "warn" : undefined} />
             <Stat label="GPU média" value={fmtPct(t.gpu_avg_now)} hint="agora, máquinas online" />
@@ -74,15 +74,15 @@ export default function Overview() {
               <Empty>Nenhuma máquina cadastrada. Cadastre as Sparks em <Link className="underline" href="/admin">Administração</Link> e instale o agente em cada uma.</Empty>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-sm">
+                <table className="w-full min-w-[860px] text-sm [&_thead_th]:align-bottom">
                   <thead className="text-left text-xs text-mute">
-                    <tr><th className="py-1">Máquina</th><th>Estado</th><th>GPU agora</th><th>GPU média ({ov.data.window})</th><th>Mem. unificada</th><th>CPU</th><th>Disco</th><th>Classificação</th><th>Atualização</th></tr>
+                    <tr><th className="py-1">Máquina</th><th>Estado</th><th>GPU agora</th><th>GPU média<span className="block">({ov.data.window})</span></th><th>Mem. unificada</th><th>CPU</th><th>Disco</th><th>Classificação</th><th>Atualização</th></tr>
                   </thead>
                   <tbody>
                     {rows.map((m, i) => (
                       <tr key={m.id} className="border-t border-line align-middle">
-                        <td className="py-2"><Link href={`/machines/${m.id}`} className="font-medium text-brand hover:underline">{m.name}</Link>
-                          {i === 0 && sort === "gpu" && m.analysis.gpu_mean != null && <span className="ml-2 text-xs text-cyan-900">menos utilizada</span>}
+                        <td className="py-2"><Link href={`/machines/${m.id}`} className="whitespace-nowrap font-medium text-brand hover:underline">{m.name}</Link>
+                          {i === 0 && sort === "gpu" && m.analysis.gpu_mean != null && <span className="mt-0.5 block w-fit border border-cyan-300 bg-cyan-50 px-1 text-[10px] leading-4 text-cyan-900">menos utilizada</span>}
                           <div className="text-xs text-mute">{(m.projects as any[]).map((p) => p.name).join(", ") || "sem projeto"}</div></td>
                         <td><StatusBadge status={m.status} /></td>
                         <td><Bar value={m.latest?.gpu_util_percent} /></td>

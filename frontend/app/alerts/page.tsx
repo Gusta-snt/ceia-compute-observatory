@@ -5,6 +5,7 @@ import { fmtDateTime } from "@/lib/api";
 import { Card, Empty, ErrorBox, Loading, Segmented } from "@/components/ui";
 
 const SEV: Record<string, string> = { critical: "text-red-700", warning: "text-amber-700", info: "text-slate-600" };
+const SEV_LABEL: Record<string, string> = { critical: "Crítico", warning: "Aviso", info: "Info" };
 
 export default function Alerts() {
   const [status, setStatus] = useState("all");
@@ -30,7 +31,7 @@ export default function Alerts() {
               <thead className="text-left text-xs text-mute"><tr><th className="py-1">Severidade</th><th>Máquina</th><th>Regra</th><th>Mensagem</th><th>Aberto</th><th>Resolvido</th></tr></thead>
               <tbody>{a.data.items.map((x: any) => (
                 <tr key={x.id} className="border-t border-line align-top">
-                  <td className={`py-1.5 font-medium ${SEV[x.severity]}`}>{x.severity}</td><td>{x.machine ?? "—"}</td>
+                  <td className={`font-medium ${SEV[x.severity]}`}>{SEV_LABEL[x.severity] ?? x.severity}</td><td>{x.machine ?? "—"}</td>
                   <td className="font-mono text-xs">{x.rule}</td><td>{x.message}</td><td className="text-xs">{fmtDateTime(x.opened_at)}</td>
                   <td className="text-xs">{x.resolved_at ? fmtDateTime(x.resolved_at) : <span className="text-red-700">aberto</span>}</td>
                 </tr>))}</tbody>
