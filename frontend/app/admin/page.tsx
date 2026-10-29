@@ -28,7 +28,7 @@ export default function Admin() {
     try { const r = await fn(); setMsg({ ok: true, t: ok }); machines.reload(); return r; } catch (e: any) { setMsg({ ok: false, t: e.message }); }
   }
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <h1 className="text-xl font-medium text-navy-900">Administração</h1>
       {msg && <div role="status" className={`border px-3 py-2 text-sm ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{msg.t}</div>}
       {token && (

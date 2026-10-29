@@ -82,7 +82,7 @@ export default function MachinePage() {
   const d = m.data, L = d.latest, st = s.data;
   const mt = (k: string) => st?.metrics?.[k];
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-medium text-navy-900">{d.name}</h1>
@@ -92,7 +92,7 @@ export default function MachinePage() {
           <Segmented label="Intervalo" value={range} onChange={setRange} options={RANGES as any} /></div>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="GPU agora" value={fmtPct(L?.gpu_util_percent)} hint={L?.quality?.gpu_util_percent ? `fonte: ${L.quality.gpu_util_percent}` : undefined} />
         <Stat label="Memória unificada" value={fmtPct(L?.unified_percent)} hint={L ? `${fmtBytes(L.unified_used_bytes)} de ${fmtBytes(L.unified_total_bytes)}` : undefined} />
         <Stat label="Disponível" value={fmtBytes(L?.unified_available_bytes)} hint="memória unificada (CPU+GPU, mesmo pool)" />

@@ -13,7 +13,7 @@ export default function Analysis() {
   const cmp = useApi<any>(`/analysis/compare?range=${range}`);
   const f = (v: number | null | undefined, d = 1) => (v == null ? "—" : v.toFixed(d));
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <header>
         <h1 className="text-xl font-medium text-navy-900">Análise histórica e capacidade</h1>
         <p className="text-sm text-mute">Evidências para decidir a alocação de projetos. Os limites de classificação são configuráveis em Administração.</p>

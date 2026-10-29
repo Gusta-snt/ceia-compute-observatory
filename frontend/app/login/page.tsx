@@ -17,14 +17,14 @@ export default function Login() {
     catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   }
   return (
-    <div className="flex min-h-screen items-center justify-center bg-navy-900 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 bg-white p-6">
+    <div className="bg-drift flex min-h-screen items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 p-4">
+      <form onSubmit={submit} className="anim-rise w-full max-w-sm space-y-4 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,.55)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/ceia.png" alt="CEIA" className="h-12" />
         <h1 className="text-lg font-medium text-navy-900">CEIA Compute Observatory</h1>
         <Field label="Usuário"><input className={inputCls} value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" required /></Field>
         <Field label="Senha"><input className={inputCls} type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required /></Field>
-        {err && <div role="alert" className="text-sm text-red-700">{err}</div>}
+        {err && <div key={err} role="alert" className="anim-rise text-sm text-red-700">{err}</div>}
         <Button disabled={busy} className="w-full">{busy ? "Entrando…" : "Entrar"}</Button>
       </form>
     </div>

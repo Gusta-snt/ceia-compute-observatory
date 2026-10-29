@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { METRICS } from "@/lib/api";
 
@@ -12,6 +13,13 @@ export function TimeChart({ data, series, metric, gaps = [], height = 260, domai
 }) {
   const m = METRICS[metric];
   const span = data.length ? data[data.length - 1].t - data[0].t : 0;
+  // Desenha as linhas só na primeira exibição: as atualizações ao vivo (a cada poucos segundos) não redesenham.
+  const [draw, setDraw] = useState(true);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setDraw(false); return; }
+    const t = setTimeout(() => setDraw(false), 1100);
+    return () => clearTimeout(t);
+  }, []);
   return (
     <div style={{ height }} role="img" aria-label={`Série temporal: ${m?.label ?? metric}`}>
       <ResponsiveContainer>
@@ -20,7 +28,9 @@ export function TimeChart({ data, series, metric, gaps = [], height = 260, domai
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => tfmt(t, span)} fontSize={11} tickLine={false} />
           <YAxis fontSize={11} width={52} tickLine={false} domain={domain ?? (m?.unit === "%" ? [0, 100] : ["auto", "auto"])}
             tickFormatter={(v) => (m?.unit === "%" ? `${v}%` : m?.fmt ? m.fmt(v) : v)} />
-          <Tooltip labelFormatter={(t) => new Date((t as number) * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+          <Tooltip cursor={{ stroke: "#94a3b8", strokeDasharray: "3 3" }} animationDuration={150}
+            contentStyle={{ border: "1px solid #dfe5ea", borderRadius: 0, fontSize: 12, boxShadow: "0 4px 14px -6px rgba(2,48,72,.25)" }}
+            labelFormatter={(t) => new Date((t as number) * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
             formatter={(v: any, n: any) => [v == null ? "indisponível" : m?.fmt(v) ?? v, n]} />
           {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
           {gaps.map((g, i) => (
@@ -28,7 +38,8 @@ export function TimeChart({ data, series, metric, gaps = [], height = 260, domai
           ))}
           {series.map((s, i) => (
             <Line key={s.key} dataKey={s.key} name={s.name} stroke={s.color ?? PALETTE[i % PALETTE.length]} dot={false}
-              strokeWidth={1.6} connectNulls={false} isAnimationActive={false} />
+              strokeWidth={1.6} connectNulls={false} isAnimationActive={draw} animationDuration={900} animationEasing="ease-out"
+              animationBegin={i * 80} activeDot={{ r: 3.5, strokeWidth: 0 }} />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -48,7 +59,9 @@ export function Heatmap({ grid, unit = "%" }: { grid: (number | null)[][]; unit?
             <tr key={d}>
               <th className="pr-2 text-right font-normal text-mute">{DAYS[d]}</th>
               {row.map((v, h) => (
-                <td key={h} title={`${DAYS[d]} ${h}h: ${v == null ? "sem dados" : v.toFixed(1) + unit}`} className="h-6 w-6" style={{ background: color(v) }} />
+                <td key={h} title={`${DAYS[d]} ${h}h: ${v == null ? "sem dados" : v.toFixed(1) + unit}`}
+                  className="anim-fade h-6 w-6 transition-[transform,box-shadow] duration-150 hover:relative hover:z-10 hover:scale-125 hover:shadow-[0_0_0_1px_#023048]"
+                  style={{ background: color(v), ["--i" as any]: h + d * 2 }} />
               ))}
             </tr>
           ))}

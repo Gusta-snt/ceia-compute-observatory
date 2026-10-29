@@ -1,10 +1,10 @@
 "use client";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { STATUS_LABEL } from "@/lib/api";
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`border border-line bg-white ${className}`}>
+    <section className={`border border-line bg-white transition-[border-color,box-shadow] duration-200 hover:border-slate-300 hover:shadow-[0_2px_10px_-6px_rgba(2,48,72,.25)] ${className}`}>
       {(title || actions) && (
         <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-medium text-navy-900">{title}</h2>
@@ -16,11 +16,36 @@ export function Card({ title, actions, children, className = "" }: { title?: Rea
   );
 }
 
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** Número que conta do valor anterior até o novo (600 ms); inteiros continuam inteiros. */
+export function CountUp({ value, ms = 600 }: { value: number; ms?: number }) {
+  const [shown, setShown] = useState(0);   // começa em 0 também no servidor (sem divergência na hidratação)
+  const from = useRef(0);
+  useEffect(() => {
+    if (reducedMotion()) { from.current = value; setShown(value); return; }
+    const start = performance.now(), a = from.current;
+    let raf = 0;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / ms);
+      const v = a + (value - a) * (1 - Math.pow(1 - k, 3));
+      from.current = v; setShown(v);
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value, ms]);
+  return <>{Number.isInteger(value) ? Math.round(shown) : shown.toFixed(1)}</>;
+}
+
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "warn" | "ok" }) {
   return (
-    <div className="border border-line bg-white px-4 py-3">
+    <div className="group relative overflow-hidden border border-line bg-white px-4 py-3 transition-[border-color,transform] duration-200 hover:-translate-y-px hover:border-slate-300">
+      <span aria-hidden className="absolute inset-x-0 bottom-0 h-0.5 origin-left scale-x-0 bg-brand transition-transform duration-300 group-hover:scale-x-100" />
       <div className="text-xs uppercase tracking-wide text-mute">{label}</div>
-      <div className={`num mt-1 text-2xl font-medium ${tone === "warn" ? "text-amber-700" : "text-navy-900"}`}>{value}</div>
+      <div className={`num mt-1 text-2xl font-medium transition-colors duration-300 ${tone === "warn" ? "text-amber-700" : "text-navy-900"}`}>
+        {typeof value === "number" ? <CountUp value={value} /> : <span key={String(value)} className="anim-tick inline-block">{value}</span>}
+      </div>
       {hint && <div className="mt-0.5 text-xs text-mute">{hint}</div>}
     </div>
   );
@@ -32,8 +57,18 @@ const STATUS_STYLE: Record<string, string> = {
   agente_com_problema: "bg-amber-50 text-amber-800 border-amber-200",
   dados_insuficientes: "bg-slate-100 text-slate-700 border-slate-300",
 };
+const STATUS_DOT: Record<string, string> = { online: "bg-emerald-500", sem_comunicacao: "bg-red-500", agente_com_problema: "bg-amber-500" };
 export function StatusBadge({ status }: { status: string }) {
-  return <span className={`inline-block border px-2 py-0.5 text-xs ${STATUS_STYLE[status] ?? STATUS_STYLE.dados_insuficientes}`}>{STATUS_LABEL[status] ?? status}</span>;
+  const dot = STATUS_DOT[status] ?? "bg-slate-400";
+  return (
+    <span className={`inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs transition-colors duration-300 ${STATUS_STYLE[status] ?? STATUS_STYLE.dados_insuficientes}`}>
+      <span aria-hidden className="relative flex h-1.5 w-1.5">
+        {status === "online" && <span className={`ping-soft absolute inset-0 rounded-full ${dot}`} />}
+        <span className={`relative h-1.5 w-1.5 rounded-full ${dot}`} />
+      </span>
+      {STATUS_LABEL[status] ?? status}
+    </span>
+  );
 }
 
 const CLASS_STYLE: Record<string, string> = {
@@ -44,22 +79,27 @@ const CLASS_STYLE: Record<string, string> = {
   insuficiente: "bg-slate-100 text-slate-700 border-slate-300",
 };
 export function ClassBadge({ k, label }: { k: string; label: string }) {
-  return <span className={`inline-block border px-2 py-0.5 text-xs ${CLASS_STYLE[k] ?? CLASS_STYLE.insuficiente}`}>{label}</span>;
+  return <span className={`inline-block border px-2 py-0.5 text-xs transition-colors duration-300 ${CLASS_STYLE[k] ?? CLASS_STYLE.insuficiente}`}>{label}</span>;
 }
 
 export function Loading({ label = "Carregando…" }: { label?: string }) {
-  return <div role="status" className="py-10 text-center text-sm text-mute">{label}</div>;
+  return (
+    <div role="status" className="anim-fade space-y-2.5 py-4">
+      <span className="sr-only">{label}</span>
+      {[92, 78, 85, 60].map((w, i) => <div key={i} aria-hidden className="skeleton h-3" style={{ width: `${w}%`, animationDelay: `${i * 90}ms` }} />)}
+    </div>
+  );
 }
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+    <div role="alert" className="anim-rise border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
       {message}
-      {onRetry && <button onClick={onRetry} className="ml-3 underline">Tentar novamente</button>}
+      {onRetry && <button onClick={onRetry} className="ml-3 underline transition-colors hover:text-red-950">Tentar novamente</button>}
     </div>
   );
 }
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-mute">{children}</div>;
+  return <div className="anim-fade border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-mute">{children}</div>;
 }
 
 export function Bar({ value, tone = "brand" }: { value: number | null | undefined; tone?: "brand" | "warn" }) {
@@ -67,8 +107,8 @@ export function Bar({ value, tone = "brand" }: { value: number | null | undefine
   const v = Math.max(0, Math.min(100, value));
   return (
     <div className="flex items-center gap-2" aria-label={`${v.toFixed(0)}%`}>
-      <div className="h-1.5 w-20 bg-slate-200">
-        <div className={`h-full ${v >= 90 ? "bg-red-600" : tone === "warn" ? "bg-amber-500" : "bg-brand"}`} style={{ width: `${v}%` }} />
+      <div className="h-1.5 w-20 overflow-hidden bg-slate-200">
+        <div className={`anim-grow h-full transition-[width,background-color] duration-700 ease-out ${v >= 90 ? "bg-red-600" : tone === "warn" ? "bg-amber-500" : "bg-brand"}`} style={{ width: `${v}%` }} />
       </div>
       <span className="num w-10 text-right text-xs">{v.toFixed(0)}%</span>
     </div>
@@ -80,7 +120,7 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
     <div role="group" aria-label={label} className="inline-flex border border-line">
       {options.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)} aria-pressed={v === value}
-          className={`px-2.5 py-1 text-xs ${v === value ? "bg-navy-900 text-white" : "bg-white text-ink hover:bg-slate-50"}`}>{l}</button>
+          className={`px-2.5 py-1 text-xs transition-colors duration-200 ${v === value ? "bg-navy-900 text-white" : "bg-white text-ink hover:bg-slate-100"}`}>{l}</button>
       ))}
     </div>
   );
@@ -88,9 +128,9 @@ export function Segmented<T extends string>({ value, onChange, options, label }:
 
 export function Button({ children, variant = "primary", ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "danger" }) {
   const s = variant === "primary" ? "bg-navy-900 text-white hover:bg-navy-800" : variant === "danger" ? "bg-red-700 text-white hover:bg-red-800" : "border border-line bg-white hover:bg-slate-50";
-  return <button {...p} className={`px-3 py-1.5 text-sm disabled:opacity-50 ${s} ${p.className ?? ""}`}>{children}</button>;
+  return <button {...p} className={`px-3 py-1.5 text-sm transition-[background-color,border-color,transform,opacity] duration-150 active:translate-y-px disabled:opacity-50 disabled:active:translate-y-0 ${s} ${p.className ?? ""}`}>{children}</button>;
 }
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block text-sm"><span className="mb-1 block text-xs text-mute">{label}</span>{children}</label>;
 }
-export const inputCls = "w-full border border-line bg-white px-2 py-1.5 text-sm";
+export const inputCls = "w-full border border-line bg-white px-2 py-1.5 text-sm transition-[border-color,box-shadow] duration-150 hover:border-slate-300 focus:border-brand focus:shadow-[0_0_0_3px_rgba(35,117,228,.15)] focus:outline-none";

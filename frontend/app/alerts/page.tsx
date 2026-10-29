@@ -14,7 +14,7 @@ export default function Alerts() {
   const q = `/alerts?status=${status}${sev ? `&severity=${sev}` : ""}${mid ? `&machine_id=${mid}` : ""}`;
   const a = useApi<any>(q, 30000);
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <h1 className="text-xl font-medium text-navy-900">Alertas e eventos</h1>
       <Card actions={<>
         <Segmented label="Estado" value={status} onChange={setStatus} options={[["all", "Todos"], ["open", "Abertos"], ["resolved", "Resolvidos"]]} />

@@ -48,7 +48,7 @@ export default function Overview() {
 
   const t = ov.data?.totals;
   return (
-    <div className="space-y-5">
+    <div className="page space-y-5">
       <header>
         <h1 className="text-xl font-medium text-navy-900">Visão geral da infraestrutura</h1>
         <p className="text-sm text-mute">Como os recursos computacionais das DGX Sparks estão sendo utilizados.</p>
@@ -56,7 +56,7 @@ export default function Overview() {
 
       {ov.loading && !ov.data ? <Loading /> : ov.error ? <ErrorBox message={ov.error} onRetry={ov.reload} /> : t && (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+          <div className="stagger grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
             <Stat label="Sparks" value={t.machines} />
             <Stat label="Online" value={t.online} hint={t.sem_comunicacao ? `${t.sem_comunicacao} sem comunicação` : undefined} tone={t.sem_comunicacao ? "warn" : undefined} />
             <Stat label="GPU média" value={fmtPct(t.gpu_avg_now)} hint="agora, máquinas online" />

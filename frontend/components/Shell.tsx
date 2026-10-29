@@ -32,15 +32,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="px-4 pb-1 pt-4">
           <div className="flex items-center gap-2 text-sm font-medium"><Activity size={16} className="text-cyan-brand" aria-hidden />{brand.name}</div>
-          {brand.demo_mode && <div className="mt-2 border border-amber-300 px-2 py-0.5 text-xs text-amber-200">MODO DEMONSTRAÇÃO</div>}
+          {brand.demo_mode && <div className="anim-fade mt-2 border border-amber-300 px-2 py-0.5 text-xs text-amber-200">MODO DEMONSTRAÇÃO</div>}
         </div>
         <nav aria-label="Principal" className="flex flex-row gap-1 overflow-x-auto px-2 py-3 md:flex-col">
           {NAV.map(({ href, label, icon: I }) => {
             const on = href === "/" ? path === "/" : path.startsWith(href);
             return (
               <Link key={href} href={href} aria-current={on ? "page" : undefined}
-                className={`flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm ${on ? "bg-navy-800 text-white" : "text-slate-300 hover:bg-navy-800/60"}`}>
-                <I size={16} aria-hidden />{label}
+                className={`group relative flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-200 ${on ? "bg-navy-800 text-white" : "text-slate-300 hover:bg-navy-800/60 hover:text-white"}`}>
+                <span aria-hidden className={`absolute bottom-0 left-0 h-0.5 w-full origin-left bg-cyan-brand transition-transform duration-300 md:top-0 md:h-full md:w-0.5 md:origin-top ${on ? "scale-100" : "scale-0"}`} />
+                <I size={16} aria-hidden className={`transition-transform duration-200 group-hover:scale-110 ${on ? "text-cyan-brand" : ""}`} />{label}
               </Link>
             );
           })}
@@ -49,7 +50,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={brand.ufg_logo} alt="Universidade Federal de Goiás" className="h-12 w-auto" />
           {user && (
-            <button className="flex items-center gap-1 text-xs text-slate-300 hover:text-white"
+            <button className="anim-fade flex items-center gap-1 text-xs text-slate-300 transition-colors hover:text-white"
               onClick={async () => { await api("/auth/logout", { method: "POST" }); router.push("/login"); }}>
               <LogOut size={12} aria-hidden /> Sair ({user})
             </button>
