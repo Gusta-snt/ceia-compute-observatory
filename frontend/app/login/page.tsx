@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { refreshMe } from "@/lib/me";
 import { Button, Field, inputCls } from "@/components/ui";
 
 export default function Login() {
@@ -13,7 +14,7 @@ export default function Login() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    try { await api("/auth/login", { method: "POST", json: { username: u, password: p } }); r.push("/"); }
+    try { await api("/auth/login", { method: "POST", json: { username: u, password: p } }); await refreshMe(); r.push("/"); }
     catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   }
   return (

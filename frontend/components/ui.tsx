@@ -97,6 +97,14 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
     </div>
   );
 }
+export function Restricted() {
+  return (
+    <div className="page space-y-5">
+      <h1 className="text-xl font-medium text-navy-900">Acesso restrito</h1>
+      <Empty>Esta área é só para administradores. Se precisar de acesso, fale com um administrador da central.</Empty>
+    </div>
+  );
+}
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="border border-dashed border-line bg-white px-4 py-8 text-center text-sm text-mute">{children}</div>;
 }

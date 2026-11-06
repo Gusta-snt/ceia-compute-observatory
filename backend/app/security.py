@@ -45,11 +45,12 @@ def hash_token(tok: str) -> str:
 def make_session(user: User) -> str:
     s = get_settings()
     exp = datetime.now(timezone.utc) + timedelta(hours=s.session_hours)
-    return jwt.encode({"sub": str(user.id), "usr": user.username, "typ": "admin", "exp": exp}, s.secret_key, "HS256")
+    return jwt.encode({"sub": str(user.id), "usr": user.username, "typ": "session", "ver": user.session_version or 0,
+                       "exp": exp}, s.secret_key, "HS256")
 
 
-def current_admin(request: Request, db: Session = Depends(get_db), ceia_session: str | None = Cookie(None)) -> User:
-    """Apenas sessões de administrador. Tokens de agente nunca passam por aqui."""
+def current_user(request: Request, db: Session = Depends(get_db), ceia_session: str | None = Cookie(None)) -> User:
+    """Qualquer usuário ativo com sessão válida. Tokens de agente nunca passam por aqui."""
     s = get_settings()
     if not ceia_session:
         raise HTTPException(401, "não autenticado")
@@ -57,11 +58,22 @@ def current_admin(request: Request, db: Session = Depends(get_db), ceia_session:
         data = jwt.decode(ceia_session, s.secret_key, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(401, "sessão inválida ou expirada")
-    if data.get("typ") != "admin":
+    if data.get("typ") not in ("session", "admin"):  # "admin": sessões emitidas antes dos papéis
         raise HTTPException(401, "sessão inválida")
     user = db.get(User, int(data["sub"]))
     if not user:
         raise HTTPException(401, "usuário inexistente")
+    if not user.active:
+        raise HTTPException(401, "usuário desativado")
+    if data.get("ver", 0) != (user.session_version or 0):
+        raise HTTPException(401, "sessão encerrada; entre novamente")
+    return user
+
+
+def current_admin(user: User = Depends(current_user)) -> User:
+    """Apenas administradores."""
+    if user.role != "admin":
+        raise HTTPException(403, "apenas administradores")
     return user
 
 

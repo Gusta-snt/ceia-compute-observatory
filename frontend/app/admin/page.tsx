@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { api, ago } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
-import { Button, Card, Empty, ErrorBox, Field, Loading, StatusBadge, inputCls } from "@/components/ui";
+import { useMe } from "@/lib/me";
+import { Button, Card, Empty, ErrorBox, Field, Loading, Restricted, StatusBadge, inputCls } from "@/components/ui";
 
 const LABELS: Record<string, string> = {
   min_coverage: "Cobertura mínima (0–1)", idle_gpu_percent: "Ociosidade: GPU abaixo de (%)", idle_cpu_percent: "Ociosidade: CPU abaixo de (%)",
@@ -15,7 +16,14 @@ const LABELS: Record<string, string> = {
 
 const AGENT_INSTALL_URL = "https://raw.githubusercontent.com/Gusta-snt/ceia-compute-observatory/main/agent/install.sh";
 
-export default function Admin() {
+export default function AdminPage() {
+  const { me, loading } = useMe();
+  if (loading) return <Loading />;
+  if (me?.role !== "admin") return <Restricted />;
+  return <Admin />;
+}
+
+function Admin() {
   const machines = useApi<any[]>("/machines?include_inactive=true", 60000, "all");
   const settings = useApi<any>("/settings");
   const [form, setForm] = useState({ name: "", hostname: "", address: "", hardware: "NVIDIA DGX Spark (GB10)", notes: "" });

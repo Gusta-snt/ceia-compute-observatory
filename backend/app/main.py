@@ -25,7 +25,8 @@ def bootstrap_admin() -> None:
     s = get_settings()
     with SessionLocal() as db:
         if s.admin_password and not db.scalar(select(func.count()).select_from(User)):
-            db.add(User(username=s.admin_username, password_hash=hash_password(s.admin_password)))
+            db.add(User(username=s.admin_username.strip().lower(), password_hash=hash_password(s.admin_password),
+                        role="admin"))
             db.commit()
             log.info("usuário administrador inicial criado: %s", s.admin_username)
 

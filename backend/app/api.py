@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -17,7 +18,7 @@ from .broadcast import broadcaster
 from .config import get_settings
 from .db import get_db
 from .models import METRIC_COLUMNS, Alert, Allocation, AvailabilityEvent, Machine, ProcessSample, Project, Rollup, Sample, User
-from .security import (COOKIE, current_admin, current_agent, hash_password, limiter, make_session,
+from .security import (COOKIE, current_admin, current_agent, current_user, hash_password, limiter, make_session,
                        new_agent_token, verify_password)
 from .services import analytics as an
 from .services.alerts import evaluate_all
@@ -26,7 +27,8 @@ from .services.ingest import BatchIn, IngestResult, ingest_batch
 from .services.status import refresh_status
 
 router = APIRouter(prefix="/api/v1")
-Admin = Depends(current_admin)
+Admin = Depends(current_admin)  # só administradores
+Auth = Depends(current_user)    # qualquer usuário ativo
 
 RANGE_PRESETS = {"1h": 1, "6h": 6, "24h": 24, "7d": 168, "30d": 720, "90d": 2160}
 
@@ -65,9 +67,23 @@ def branding(db: Session = Depends(get_db)) -> dict:
 
 
 # --------------------------------------------------------------------- auth ----
+USERNAME_RE = r"^[a-z0-9][a-z0-9._-]{1,63}$"
+
+
 class Login(BaseModel):
     username: str = Field(max_length=64)
     password: str = Field(max_length=256)
+
+
+def _set_session(response: Response, u: User) -> None:
+    s = get_settings()
+    response.set_cookie(COOKIE, make_session(u), httponly=True, samesite="lax", secure=s.cookie_secure,
+                        max_age=s.session_hours * 3600)
+
+
+def user_out(u: User) -> dict:
+    return {"id": u.id, "username": u.username, "name": u.name, "role": u.role, "active": u.active,
+            "last_login": iso(u.last_login), "created_at": iso(u.created_at)}
 
 
 @router.post("/auth/login")
@@ -75,13 +91,15 @@ def login(body: Login, request: Request, response: Response, db: Session = Depen
     ip = request.client.host if request.client else "?"
     if not limiter.check(f"login:{ip}", 10):
         raise HTTPException(429, "muitas tentativas; aguarde")
-    u = db.scalar(select(User).where(User.username == body.username))
+    u = db.scalar(select(User).where(func.lower(User.username) == body.username.strip().lower()))
     if not u or not verify_password(u.password_hash, body.password):
         raise HTTPException(401, "credenciais inválidas")
-    s = get_settings()
-    response.set_cookie(COOKIE, make_session(u), httponly=True, samesite="lax", secure=s.cookie_secure,
-                        max_age=s.session_hours * 3600)
-    return {"username": u.username}
+    if not u.active:
+        raise HTTPException(403, "usuário desativado; fale com um administrador")
+    u.last_login = datetime.now(timezone.utc)
+    db.commit()
+    _set_session(response, u)
+    return user_out(u)
 
 
 @router.post("/auth/logout")
@@ -91,20 +109,112 @@ def logout(response: Response) -> dict:
 
 
 @router.get("/auth/me")
-def me(u: User = Admin) -> dict:
-    return {"username": u.username}
+def me(u: User = Auth) -> dict:
+    return user_out(u)
 
 
 class PasswordChange(BaseModel):
-    current: str
+    current: str = Field(max_length=256)
     new: str = Field(min_length=10, max_length=256)
 
 
 @router.post("/auth/password")
-def change_password(body: PasswordChange, u: User = Admin, db: Session = Depends(get_db)) -> dict:
+def change_password(body: PasswordChange, response: Response, u: User = Auth, db: Session = Depends(get_db)) -> dict:
     if not verify_password(u.password_hash, body.current):
         raise HTTPException(403, "senha atual incorreta")
     u.password_hash = hash_password(body.new)
+    u.session_version = (u.session_version or 0) + 1  # encerra as outras sessões
+    db.commit()
+    _set_session(response, u)  # mantém esta
+    return {"ok": True}
+
+
+# ----------------------------------------------------------------- usuários ----
+class UserIn(BaseModel):
+    username: str = Field(min_length=2, max_length=64)
+    name: str | None = Field(None, max_length=120)
+    password: str = Field(min_length=10, max_length=256)
+    role: str = Field("usuario", pattern="^(admin|usuario)$")
+
+
+class UserPatch(BaseModel):
+    name: str | None = Field(None, max_length=120)
+    role: str | None = Field(None, pattern="^(admin|usuario)$")
+    active: bool | None = None
+
+
+class PasswordReset(BaseModel):
+    password: str = Field(min_length=10, max_length=256)
+
+
+def _get_user(db: Session, uid: int) -> User:
+    u = db.get(User, uid)
+    if not u:
+        raise HTTPException(404, "usuário não encontrado")
+    return u
+
+
+def _other_active_admins(db: Session, u: User) -> int:
+    return db.scalar(select(func.count()).select_from(User).where(
+        User.role == "admin", User.active.is_(True), User.id != u.id)) or 0
+
+
+@router.get("/users")
+def list_users(_: User = Admin, db: Session = Depends(get_db)) -> list[dict]:
+    return [user_out(u) for u in db.scalars(select(User).order_by(User.username))]
+
+
+@router.post("/users", status_code=201)
+def create_user(body: UserIn, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+    username = body.username.strip().lower()
+    if not re.match(USERNAME_RE, username):
+        raise HTTPException(422, "usuário: use letras minúsculas, números, ponto, hífen ou sublinhado")
+    if db.scalar(select(User.id).where(func.lower(User.username) == username)):
+        raise HTTPException(409, "já existe um usuário com esse nome")
+    u = User(username=username, name=(body.name or "").strip() or None, role=body.role,
+             password_hash=hash_password(body.password))
+    db.add(u)
+    db.commit()
+    return user_out(u)
+
+
+@router.patch("/users/{uid}")
+def patch_user(uid: int, body: UserPatch, me_: User = Admin, db: Session = Depends(get_db)) -> dict:
+    u = _get_user(db, uid)
+    data = body.model_dump(exclude_unset=True)
+    losing_admin = (data.get("role", u.role) != "admin" or data.get("active", u.active) is False) and u.role == "admin"
+    if u.id == me_.id and losing_admin:
+        raise HTTPException(409, "você não pode remover o próprio acesso de administrador")
+    if losing_admin and u.active and not _other_active_admins(db, u):
+        raise HTTPException(409, "precisa haver ao menos um administrador ativo")
+    if "name" in data:
+        u.name = (data["name"] or "").strip() or None
+    if data.get("role") is not None:
+        u.role = data["role"]
+    if data.get("active") is not None and data["active"] != u.active:
+        u.active = data["active"]
+        u.session_version = (u.session_version or 0) + 1
+    db.commit()
+    return user_out(u)
+
+
+@router.post("/users/{uid}/password")
+def reset_password(uid: int, body: PasswordReset, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+    u = _get_user(db, uid)
+    u.password_hash = hash_password(body.password)
+    u.session_version = (u.session_version or 0) + 1  # derruba as sessões abertas desse usuário
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/users/{uid}")
+def delete_user(uid: int, me_: User = Admin, db: Session = Depends(get_db)) -> dict:
+    u = _get_user(db, uid)
+    if u.id == me_.id:
+        raise HTTPException(409, "você não pode apagar o próprio usuário")
+    if u.role == "admin" and u.active and not _other_active_admins(db, u):
+        raise HTTPException(409, "precisa haver ao menos um administrador ativo")
+    db.delete(u)
     db.commit()
     return {"ok": True}
 
@@ -130,7 +240,7 @@ def ingest(batch: BatchIn, machine: Machine = Depends(current_agent), db: Sessio
 
 
 @router.get("/stream")
-async def stream(request: Request, _: User = Admin) -> StreamingResponse:
+async def stream(request: Request, _: User = Auth) -> StreamingResponse:
     """SSE: empurra cada ingestão para os dashboards abertos (substitui o polling curto)."""
     q = broadcaster.subscribe()
 
@@ -192,7 +302,7 @@ def _alloc_active(a: Allocation) -> bool:
 
 
 @router.get("/machines")
-def list_machines(include_inactive: bool = False, _: User = Admin, db: Session = Depends(get_db)) -> list[dict]:
+def list_machines(include_inactive: bool = False, _: User = Auth, db: Session = Depends(get_db)) -> list[dict]:
     q = select(Machine).order_by(Machine.name)
     if not include_inactive:
         q = q.where(Machine.active.is_(True))
@@ -212,7 +322,7 @@ def create_machine(body: MachineIn, _: User = Admin, db: Session = Depends(get_d
 
 
 @router.get("/machines/{mid}")
-def get_one(mid: int, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def get_one(mid: int, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     return machine_out(db, get_machine(db, mid))
 
 
@@ -263,7 +373,7 @@ def revoke_token(mid: int, _: User = Admin, db: Session = Depends(get_db)) -> di
 @router.get("/machines/{mid}/metrics")
 def machine_metrics(mid: int, metrics: str = "gpu_util_percent,unified_percent,cpu_percent", range: str = "24h",
                     frm: str | None = Query(None, alias="from"), to: str | None = None, bucket: int | None = None,
-                    _: User = Admin, db: Session = Depends(get_db)) -> dict:
+                    _: User = Auth, db: Session = Depends(get_db)) -> dict:
     get_machine(db, mid)
     names = [x for x in metrics.split(",") if x in METRIC_COLUMNS]
     if not names:
@@ -274,7 +384,7 @@ def machine_metrics(mid: int, metrics: str = "gpu_util_percent,unified_percent,c
 
 @router.get("/machines/{mid}/summary")
 def machine_summary(mid: int, range: str = "24h", frm: str | None = Query(None, alias="from"), to: str | None = None,
-                    _: User = Admin, db: Session = Depends(get_db)) -> dict:
+                    _: User = Auth, db: Session = Depends(get_db)) -> dict:
     m = get_machine(db, mid)
     s, e = parse_range(frm, to, range)
     return an.window_analysis(db, m, s, e)
@@ -282,7 +392,7 @@ def machine_summary(mid: int, range: str = "24h", frm: str | None = Query(None, 
 
 @router.get("/machines/{mid}/processes")
 def machine_processes(mid: int, range: str = "24h", frm: str | None = Query(None, alias="from"), to: str | None = None,
-                      sort: str = "cpu", limit: int = Query(20, ge=1, le=100), _: User = Admin,
+                      sort: str = "cpu", limit: int = Query(20, ge=1, le=100), _: User = Auth,
                       db: Session = Depends(get_db)) -> dict:
     """Ranking de processos (agrupados por nome + usuário) na janela.
 
@@ -314,7 +424,7 @@ def machine_processes(mid: int, range: str = "24h", frm: str | None = Query(None
 
 
 @router.get("/machines/{mid}/availability")
-def machine_availability(mid: int, range: str = "30d", _: User = Admin, db: Session = Depends(get_db)) -> list[dict]:
+def machine_availability(mid: int, range: str = "30d", _: User = Auth, db: Session = Depends(get_db)) -> list[dict]:
     get_machine(db, mid)
     s, _e = parse_range(None, None, range)
     evs = db.scalars(select(AvailabilityEvent).where(AvailabilityEvent.machine_id == mid)
@@ -329,7 +439,7 @@ def _active(db: Session) -> list[Machine]:
 
 
 @router.get("/overview")
-def overview(window: str = "24h", _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def overview(window: str = "24h", _: User = Auth, db: Session = Depends(get_db)) -> dict:
     s, e = parse_range(None, None, window)
     machines = _active(db)
     cards = []
@@ -372,7 +482,7 @@ def overview(window: str = "24h", _: User = Admin, db: Session = Depends(get_db)
 
 @router.get("/infrastructure/timeseries")
 def infra_series(metric: str = "gpu_util_percent", range: str = "24h", frm: str | None = Query(None, alias="from"),
-                 to: str | None = None, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+                 to: str | None = None, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     if metric not in METRIC_COLUMNS:
         raise HTTPException(422, "métrica inválida")
     s, e = parse_range(frm, to, range)
@@ -384,7 +494,7 @@ def infra_series(metric: str = "gpu_util_percent", range: str = "24h", frm: str 
 
 @router.get("/infrastructure/heatmap")
 def infra_heatmap(metric: str = "gpu_util_percent", days: int = Query(14, ge=1, le=90), machine_id: int | None = None,
-                  _: User = Admin, db: Session = Depends(get_db)) -> dict:
+                  _: User = Auth, db: Session = Depends(get_db)) -> dict:
     if metric not in METRIC_COLUMNS:
         raise HTTPException(422, "métrica inválida")
     ids = [machine_id] if machine_id else [m.id for m in _active(db)]
@@ -394,7 +504,7 @@ def infra_heatmap(metric: str = "gpu_util_percent", days: int = Query(14, ge=1, 
 # ------------------------------------------------------------------ análise ----
 @router.get("/analysis/compare")
 def compare(range: str = "7d", frm: str | None = Query(None, alias="from"), to: str | None = None,
-            _: User = Admin, db: Session = Depends(get_db)) -> dict:
+            _: User = Auth, db: Session = Depends(get_db)) -> dict:
     s, e = parse_range(frm, to, range)
     return {"from": iso(s), "to": iso(e),
             "machines": [{"id": m.id, "name": m.name, "status": m.status, **an.window_analysis(db, m, s, e)}
@@ -402,7 +512,7 @@ def compare(range: str = "7d", frm: str | None = Query(None, alias="from"), to: 
 
 
 @router.get("/analysis/capacity")
-def capacity(_: User = Admin, db: Session = Depends(get_db)) -> dict:
+def capacity(_: User = Auth, db: Session = Depends(get_db)) -> dict:
     now = datetime.now(timezone.utc)
     rows = []
     for m in _active(db):
@@ -430,7 +540,7 @@ def capacity(_: User = Admin, db: Session = Depends(get_db)) -> dict:
 
 @router.get("/analysis/report")
 def report(range: str = "30d", frm: str | None = Query(None, alias="from"), to: str | None = None, format: str = "json",
-           _: User = Admin, db: Session = Depends(get_db)):
+           _: User = Auth, db: Session = Depends(get_db)):
     s, e = parse_range(frm, to, range)
     rows = []
     for m in _active(db):
@@ -476,7 +586,7 @@ def _csv(rows: list[dict], filename: str) -> StreamingResponse:
 @router.get("/export/samples")
 def export_samples(machine_id: int, range: str = "24h", frm: str | None = Query(None, alias="from"),
                    to: str | None = None, format: str = "csv", limit: int = Query(200_000, le=1_000_000),
-                   _: User = Admin, db: Session = Depends(get_db)):
+                   _: User = Auth, db: Session = Depends(get_db)):
     get_machine(db, machine_id)
     s, e = parse_range(frm, to, range)
     q = (select(Sample).where(Sample.machine_id == machine_id, Sample.ts_epoch >= int(s.timestamp()),
@@ -532,12 +642,12 @@ def _proj(p: Project) -> dict:
 
 
 @router.get("/projects")
-def list_projects(_: User = Admin, db: Session = Depends(get_db)) -> list[dict]:
+def list_projects(_: User = Auth, db: Session = Depends(get_db)) -> list[dict]:
     return [_proj(p) for p in db.scalars(select(Project).order_by(Project.name))]
 
 
 @router.post("/projects", status_code=201)
-def create_project(body: ProjectIn, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def create_project(body: ProjectIn, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     if db.scalar(select(Project.id).where(Project.name == body.name)):
         raise HTTPException(409, "projeto já existe")
     p = Project(**body.model_dump())
@@ -547,7 +657,7 @@ def create_project(body: ProjectIn, _: User = Admin, db: Session = Depends(get_d
 
 
 @router.put("/projects/{pid}")
-def update_project(pid: int, body: ProjectIn, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def update_project(pid: int, body: ProjectIn, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     p = db.get(Project, pid)
     if not p:
         raise HTTPException(404, "projeto não encontrado")
@@ -558,7 +668,7 @@ def update_project(pid: int, body: ProjectIn, _: User = Admin, db: Session = Dep
 
 
 @router.delete("/projects/{pid}")
-def delete_project(pid: int, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def delete_project(pid: int, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     p = db.get(Project, pid)
     if not p:
         raise HTTPException(404, "projeto não encontrado")
@@ -568,7 +678,7 @@ def delete_project(pid: int, _: User = Admin, db: Session = Depends(get_db)) -> 
 
 
 @router.post("/allocations", status_code=201)
-def create_alloc(body: AllocIn, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def create_alloc(body: AllocIn, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     get_machine(db, body.machine_id)
     if not db.get(Project, body.project_id):
         raise HTTPException(404, "projeto não encontrado")
@@ -579,7 +689,7 @@ def create_alloc(body: AllocIn, _: User = Admin, db: Session = Depends(get_db)) 
 
 
 @router.delete("/allocations/{aid}")
-def delete_alloc(aid: int, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+def delete_alloc(aid: int, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     a = db.get(Allocation, aid)
     if not a:
         raise HTTPException(404, "associação não encontrada")
@@ -589,7 +699,7 @@ def delete_alloc(aid: int, _: User = Admin, db: Session = Depends(get_db)) -> di
 
 
 @router.get("/allocations/overview")
-def alloc_overview(_: User = Admin, db: Session = Depends(get_db)) -> list[dict]:
+def alloc_overview(_: User = Auth, db: Session = Depends(get_db)) -> list[dict]:
     out = []
     for m in _active(db):
         act = [a for a in m.allocations if _alloc_active(a)]
@@ -604,7 +714,7 @@ def alloc_overview(_: User = Admin, db: Session = Depends(get_db)) -> list[dict]
 @router.get("/alerts")
 def list_alerts(status: str = "all", machine_id: int | None = None, severity: str | None = None,
                 frm: str | None = Query(None, alias="from"), to: str | None = None,
-                limit: int = Query(200, le=1000), offset: int = 0, _: User = Admin, db: Session = Depends(get_db)) -> dict:
+                limit: int = Query(200, le=1000), offset: int = 0, _: User = Auth, db: Session = Depends(get_db)) -> dict:
     q = select(Alert).order_by(Alert.opened_at.desc())
     if status == "open":
         q = q.where(Alert.resolved_at.is_(None))
@@ -626,7 +736,7 @@ def list_alerts(status: str = "all", machine_id: int | None = None, severity: st
 
 
 @router.get("/settings")
-def get_all_settings(_: User = Admin, db: Session = Depends(get_db)) -> dict:
+def get_all_settings(_: User = Auth, db: Session = Depends(get_db)) -> dict:
     return {k: get_group(db, k) for k in DEFAULTS}
 
 

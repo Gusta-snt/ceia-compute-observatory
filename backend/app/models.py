@@ -152,8 +152,15 @@ class Setting(Base):
 
 
 class User(Base):
+    """admin: tudo, inclusive máquinas, tokens, configurações e usuários. usuario: usa a central sem administrar."""
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str | None] = mapped_column(String(120))
     password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(16), default="usuario")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # incrementado ao trocar/redefinir senha ou desativar: invalida as sessões já emitidas
+    session_version: Mapped[int] = mapped_column(Integer, default=0)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
