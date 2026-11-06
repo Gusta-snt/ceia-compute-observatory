@@ -41,9 +41,9 @@ export default function Analysis() {
                       <span>Disco livre: {fmtBytes(w.capacity?.disk_free_bytes)}</span>
                       <span>Projetos: {m.projects.length ? m.projects.map((p: any) => p.name).join(", ") : "nenhum"}</span>
                     </div>
-                    <div className="mt-2 flex gap-4 text-xs">
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
                       {["24h", "7d", "30d"].map((k) => (
-                        <span key={k}>{k}: <ClassBadge k={m.windows[k].classification.key} label={m.windows[k].classification.label} /></span>
+                        <span key={k} className="whitespace-nowrap">{k}: <ClassBadge k={m.windows[k].classification.key} label={m.windows[k].classification.label} /></span>
                       ))}
                     </div>
                   </article>

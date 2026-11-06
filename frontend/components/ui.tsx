@@ -8,7 +8,7 @@ export function Card({ title, actions, children, className = "" }: { title?: Rea
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
           <h2 className="text-sm font-medium text-navy-900">{title}</h2>
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>
         </header>
       )}
       <div className="p-4">{children}</div>
@@ -124,7 +124,7 @@ export function Bar({ value, tone = "brand" }: { value: number | null | undefine
 
 export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: readonly (readonly [T, string])[]; label: string }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex border border-line">
+    <div role="group" aria-label={label} className="inline-flex max-w-full overflow-x-auto border border-line">
       {options.map(([v, l]) => (
         <button key={v} onClick={() => onChange(v)} aria-pressed={v === value}
           className={`whitespace-nowrap px-2.5 py-1 text-xs transition-colors duration-200 ${v === value ? "bg-navy-900 text-white" : "bg-white text-ink hover:bg-slate-100"}`}>{l}</button>

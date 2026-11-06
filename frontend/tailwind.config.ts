@@ -5,6 +5,7 @@ export default {
     extend: {
       colors: {
         navy: { 950: "#011a28", 900: "#023048", 800: "#0c578c", 700: "#12629c" },
+        ceia: { DEFAULT: "#1c3882", dark: "#152b66" }, // azul da marca CEIA (perfil oficial)
         brand: { DEFAULT: "#2375e4", light: "#2786fd" },
         cyan: { brand: "#1bc7fa" },
         ink: "#1f2933", mute: "#5b6b79", line: "#dfe5ea", paper: "#f4f6f8",

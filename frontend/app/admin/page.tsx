@@ -54,8 +54,8 @@ function Admin() {
             <thead className="text-left text-xs text-mute"><tr><th className="py-1">Nome</th><th>Host</th><th>Estado</th><th>Agente</th><th>Última comunicação</th><th /></tr></thead>
             <tbody>{machines.data.map((m) => (
               <tr key={m.id} className="border-t border-line">
-                <td className="py-1.5 font-medium">{m.name}{!m.active && <span className="ml-2 text-xs text-mute">(desativada)</span>}</td>
-                <td className="text-xs">{m.hostname}<br /><span className="text-mute">{m.address}</span></td>
+                <td className="whitespace-nowrap py-1.5 font-medium">{m.name}{!m.active && <span className="ml-2 text-xs text-mute">(desativada)</span>}</td>
+                <td className="whitespace-nowrap text-xs">{m.hostname}<br /><span className="text-mute">{m.address}</span></td>
                 <td><StatusBadge status={m.status} /></td><td className="text-xs">{m.agent_version ?? "—"}{!m.has_token && <span className="ml-1 text-red-700">sem token</span>}</td>
                 <td className="text-xs">{ago(m.last_seen)}</td>
                 <td className="space-x-3 text-right text-xs">
@@ -81,10 +81,10 @@ function Admin() {
 
       <Card title="Limites de classificação">
         {!cls ? <Loading /> : (
-          <form onSubmit={(e) => { e.preventDefault(); run(() => api("/settings/classification", { method: "PUT", json: cls }), "Limites salvos."); }}>
+          <form onSubmit={(e) => { e.preventDefault(); if (Object.keys(LABELS).some((k) => cls[k] === "")) { setMsg({ ok: false, t: "Preencha todos os limites antes de salvar." }); return; } run(() => api("/settings/classification", { method: "PUT", json: cls }), "Limites salvos."); }}>
             <div className="grid gap-3 md:grid-cols-3">
               {Object.keys(LABELS).map((k) => (
-                <Field key={k} label={LABELS[k]}><input type="number" step="any" className={inputCls} value={cls[k] ?? ""} onChange={(e) => setCls({ ...cls, [k]: Number(e.target.value) })} /></Field>))}
+                <Field key={k} label={LABELS[k]}><input type="number" step="any" className={inputCls} value={cls[k] ?? ""} onChange={(e) => setCls({ ...cls, [k]: e.target.value === "" ? "" : Number(e.target.value) })} /></Field>))}
             </div>
             <p className="mt-3 text-xs text-mute">Valores iniciais são pontos de partida, não verdades universais. Veja docs/METRICS.md.</p>
             <Button className="mt-3">Salvar limites</Button>
@@ -96,8 +96,8 @@ function Admin() {
           <form className="grid gap-3 md:grid-cols-2" onSubmit={(e) => { e.preventDefault(); run(() => api("/settings/branding", { method: "PUT", json: brand }), "Identidade salva. Recarregue a página."); }}>
             <Field label="Nome do sistema"><input className={inputCls} value={brand.name} onChange={(e) => setBrand({ ...brand, name: e.target.value })} /></Field>
             <Field label="Subtítulo"><input className={inputCls} value={brand.subtitle} onChange={(e) => setBrand({ ...brand, subtitle: e.target.value })} /></Field>
-            <Field label="Logo do CEIA (URL ou /brand/arquivo.png)"><input className={inputCls} value={brand.ceia_logo} onChange={(e) => setBrand({ ...brand, ceia_logo: e.target.value })} /></Field>
-            <Field label="Logo da UFG (URL ou /brand/arquivo.png)"><input className={inputCls} value={brand.ufg_logo} onChange={(e) => setBrand({ ...brand, ufg_logo: e.target.value })} /></Field>
+            <Field label="Logo do CEIA no menu, fundo azul (URL ou /brand/arquivo.png)"><input className={inputCls} value={brand.ceia_logo} onChange={(e) => setBrand({ ...brand, ceia_logo: e.target.value })} /></Field>
+            <Field label="Logo da UFG no menu, fundo azul (URL ou /brand/arquivo.png)"><input className={inputCls} value={brand.ufg_logo} onChange={(e) => setBrand({ ...brand, ufg_logo: e.target.value })} /></Field>
             <div><Button>Salvar identidade</Button></div>
           </form>)}
       </Card>

@@ -23,6 +23,7 @@ export function useMe(): { me: Me | null; loading: boolean } {
     const fn = (m: Me | null) => { setMe(m); setLoading(false); };
     subs.add(fn);
     if (current) fn(current);
+    else if (location.pathname.startsWith("/login")) setLoading(false);
     else (pending ?? refreshMe()).then(fn);
     return () => { subs.delete(fn); };
   }, []);

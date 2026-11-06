@@ -22,16 +22,26 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const [brand, setBrand] = useState<any>({ name: "CEIA Compute Observatory", ceia_logo: "/brand/ceia.png", ufg_logo: "/brand/ufg.png" });
   const { me } = useMe();
   useEffect(() => { api("/branding").then(setBrand).catch(() => {}); }, []);
+  async function logout() {
+    await api("/auth/logout", { method: "POST" }).catch(() => {});
+    clearMe();
+    router.push("/login");
+  }
   if (path.startsWith("/login")) return <>{children}</>;
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-col bg-navy-900 text-white md:w-60">
-        <div className="bg-white px-4 py-3">
+      <aside className="flex shrink-0 flex-col bg-ceia text-white md:sticky md:top-0 md:h-screen md:w-60 md:overflow-y-auto">
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={brand.ceia_logo} alt="CEIA — Centro de Excelência em Inteligência Artificial" className="h-10 w-auto" />
+          <img src={brand.ceia_logo} alt="CEIA — Centro de Excelência em Inteligência Artificial" className="h-9 w-auto max-w-full object-contain md:h-10" />
+          {me && (
+            <button className="flex items-center gap-1 whitespace-nowrap text-xs text-blue-100 transition-colors hover:text-white md:hidden" onClick={logout}>
+              <LogOut size={14} aria-hidden /> Sair
+            </button>
+          )}
         </div>
-        <div className="px-4 pb-1 pt-4">
-          <div className="flex items-center gap-2 text-sm font-medium"><Activity size={16} className="text-cyan-brand" aria-hidden />{brand.name}</div>
+        <div className="px-5 pb-1 pt-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-blue-50"><Activity size={16} className="text-cyan-brand" aria-hidden />{brand.name}</div>
           {brand.demo_mode && <div className="mt-2 border border-amber-300 px-2 py-0.5 text-xs text-amber-200">MODO DEMONSTRAÇÃO</div>}
         </div>
         <nav aria-label="Principal" className="flex flex-row gap-1 overflow-x-auto px-2 py-3 md:flex-col">
@@ -39,7 +49,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             const on = href === "/" ? path === "/" : path.startsWith(href);
             return (
               <Link key={href} href={href} aria-current={on ? "page" : undefined}
-                className={`group relative flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-200 ${on ? "bg-navy-800 text-white" : "text-slate-300 hover:bg-navy-800/60 hover:text-white"}`}>
+                className={`group relative flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm transition-colors duration-200 ${on ? "bg-white/15 text-white" : "text-blue-100 hover:bg-white/10 hover:text-white"}`}>
                 <span aria-hidden className={`absolute bottom-0 left-0 h-0.5 w-full origin-left bg-cyan-brand transition-transform duration-300 md:top-0 md:h-full md:w-0.5 md:origin-top ${on ? "scale-100" : "scale-0"}`} />
                 <I size={16} aria-hidden className={`transition-transform duration-200 group-hover:scale-110 ${on ? "text-cyan-brand" : ""}`} />{label}
               </Link>
@@ -50,8 +60,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={brand.ufg_logo} alt="Universidade Federal de Goiás" className="h-12 w-auto" />
           {me && (
-            <button className="flex items-center gap-1 text-xs text-slate-300 transition-colors hover:text-white"
-              onClick={async () => { await api("/auth/logout", { method: "POST" }); clearMe(); router.push("/login"); }}>
+            <button className="flex items-center gap-1 text-xs text-blue-100 transition-colors hover:text-white"
+              onClick={logout}>
               <LogOut size={12} aria-hidden /> Sair ({me.name || me.username})
             </button>
           )}

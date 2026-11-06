@@ -30,10 +30,12 @@ function Users({ meId }: { meId: number }) {
   }
   return (
     <div className="page space-y-5">
-      <h1 className="text-xl font-medium text-navy-900">Usuários</h1>
-      <p className="text-sm text-mute">
-        <b>Usuários</b> acessam painéis, análises, alertas e projetos. <b>Administradores</b> também cadastram máquinas, gerenciam tokens, configurações e usuários.
-      </p>
+      <header>
+        <h1 className="text-xl font-medium text-navy-900">Usuários</h1>
+        <p className="text-sm text-mute">
+          <b className="font-medium text-ink">Usuários</b> acessam painéis, análises, alertas e projetos. <b className="font-medium text-ink">Administradores</b> também cadastram máquinas, gerenciam tokens, configurações e usuários.
+        </p>
+      </header>
       {msg && <div role="status" className={`border px-3 py-2 text-sm ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{msg.t}</div>}
 
       <Card title="Contas">
@@ -44,7 +46,7 @@ function Users({ meId }: { meId: number }) {
               const self = u.id === meId;
               return (
                 <tr key={u.id} className="border-t border-line">
-                  <td className="py-1.5 font-medium">{u.username}{self && <span className="ml-2 text-xs text-mute">(você)</span>}</td>
+                  <td className="whitespace-nowrap py-1.5 font-medium">{u.username}{self && <span className="ml-2 text-xs text-mute">(você)</span>}</td>
                   <td>{u.name ?? <span className="text-mute">—</span>}</td>
                   <td><span className={`inline-block border px-2 py-0.5 text-xs ${u.role === "admin" ? "border-navy-900 bg-navy-900 text-white" : "border-line bg-slate-50"}`}>{ROLE_LABEL[u.role] ?? u.role}</span></td>
                   <td className="text-xs">{u.active ? "Ativo" : <span className="text-red-700">Desativado</span>}</td>

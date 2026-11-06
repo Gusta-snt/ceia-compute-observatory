@@ -12,6 +12,9 @@ export function TimeChart({ data, series, metric, gaps = [], height = 260, domai
   data: any[]; series: Series[]; metric: string; gaps?: { from: number; to: number }[]; height?: number; domain?: [number, number];
 }) {
   const m = METRICS[metric];
+  // Série com unidade diferente da primeira (ex.: W junto de °C) ganha eixo próprio à direita.
+  const second = series.find((s) => METRICS[s.key] && m && METRICS[s.key].unit !== m.unit);
+  const m2 = second ? METRICS[second.key] : undefined;
   const span = data.length ? data[data.length - 1].t - data[0].t : 0;
   // Desenha as linhas só na primeira exibição: as atualizações ao vivo (a cada poucos segundos) não redesenham.
   const [draw, setDraw] = useState(true);
@@ -23,21 +26,26 @@ export function TimeChart({ data, series, metric, gaps = [], height = 260, domai
   return (
     <div style={{ height }} role="img" aria-label={`Série temporal: ${m?.label ?? metric}`}>
       <ResponsiveContainer>
-        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <LineChart data={data} margin={{ top: 8, right: m2 ? 0 : 12, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="#e8edf1" vertical={false} />
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} tickFormatter={(t) => tfmt(t, span)} fontSize={11} tickLine={false} />
-          <YAxis fontSize={11} width={52} tickLine={false} domain={domain ?? (m?.unit === "%" ? [0, 100] : ["auto", "auto"])}
+          <YAxis yAxisId="l" fontSize={11} width={52} tickLine={false} domain={domain ?? (m?.unit === "%" ? [0, 100] : ["auto", "auto"])}
             tickFormatter={(v) => (m?.unit === "%" ? `${v}%` : m?.fmt ? m.fmt(v) : v)} />
+          {m2 && <YAxis yAxisId="r" orientation="right" fontSize={11} width={52} tickLine={false}
+            domain={m2.unit === "%" ? [0, 100] : ["auto", "auto"]} tickFormatter={(v) => (m2.unit === "%" ? `${v}%` : m2.fmt(v))} />}
           <Tooltip cursor={{ stroke: "#94a3b8", strokeDasharray: "3 3" }} animationDuration={150}
             contentStyle={{ border: "1px solid #dfe5ea", borderRadius: 0, fontSize: 12, boxShadow: "0 4px 14px -6px rgba(2,48,72,.25)" }}
             labelFormatter={(t) => new Date((t as number) * 1000).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-            formatter={(v: any, n: any) => [v == null ? "indisponível" : m?.fmt(v) ?? v, n]} />
+            formatter={(v: any, n: any, item: any) => {
+              const f = METRICS[item?.dataKey]?.fmt ?? m?.fmt;
+              return [v == null ? "indisponível" : f ? f(v) : v, n];
+            }} />
           {series.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
           {gaps.map((g, i) => (
-            <ReferenceArea key={i} x1={g.from} x2={g.to} fill="#94a3b8" fillOpacity={0.15} stroke="none" ifOverflow="hidden" />
+            <ReferenceArea key={i} yAxisId="l" x1={g.from} x2={g.to} fill="#94a3b8" fillOpacity={0.15} stroke="none" ifOverflow="hidden" />
           ))}
           {series.map((s, i) => (
-            <Line key={s.key} dataKey={s.key} name={s.name} stroke={s.color ?? PALETTE[i % PALETTE.length]} dot={false}
+            <Line key={s.key} yAxisId={m2 && METRICS[s.key]?.unit === m2.unit ? "r" : "l"} dataKey={s.key} name={s.name} stroke={s.color ?? PALETTE[i % PALETTE.length]} dot={false}
               strokeWidth={1.6} connectNulls={false} isAnimationActive={draw} animationDuration={900} animationEasing="ease-out"
               animationBegin={i * 80} activeDot={{ r: 3.5, strokeWidth: 0 }} />
           ))}

@@ -287,8 +287,9 @@ def classify(a: dict[str, Any], th: dict[str, Any], machine: Machine) -> dict[st
         key = "moderada"
     eligible = key == "subutilizada" and conf != "baixa"
     if a["outages"]["count"]:
-        caveats.append(f"{a['outages']['count']} período(s) sem comunicação registrado(s), "
-                       f"totalizando {a['outages']['total_seconds'] / 3600:.1f} h.")
+        n, sec = a["outages"]["count"], a["outages"]["total_seconds"]
+        dur = f"{sec:.0f} s" if sec < 90 else f"{sec / 60:.0f} min" if sec < 5400 else f"{sec / 3600:.1f} h"
+        caveats.append(f"{n} {'período' if n == 1 else 'períodos'} sem comunicação, totalizando {dur}.")
     return {"key": key, "label": LABELS[key], "confidence": conf, "reasons": reasons, "caveats": caveats,
             "eligible": eligible, "headroom_gb": headroom}
 
