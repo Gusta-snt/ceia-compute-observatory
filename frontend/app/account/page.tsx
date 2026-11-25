@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { api, fmtDateTime } from "@/lib/api";
 import { ROLE_LABEL, useMe } from "@/lib/me";
-import { Button, Card, Field, Loading, inputCls } from "@/components/ui";
+import { Button, Card, Field, Loading, inputCls, Notice } from "@/components/ui";
 
 export default function Account() {
   const { me, loading } = useMe();
@@ -22,7 +22,7 @@ export default function Account() {
   }
   return (
     <div className="page space-y-5">
-      <h1 className="text-xl font-medium text-navy-900">Minha conta</h1>
+      <h1 className="text-2xl font-medium text-heading">Minha conta</h1>
       <Card title="Perfil">
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
           <dt className="text-mute">Usuário</dt><dd className="font-medium">{me.username}</dd>
@@ -36,7 +36,7 @@ export default function Account() {
           <Field label="Senha atual"><input required type="password" autoComplete="current-password" className={inputCls} value={f.current} onChange={(e) => setF({ ...f, current: e.target.value })} /></Field>
           <Field label="Nova senha (mínimo 10 caracteres)"><input required minLength={10} type="password" autoComplete="new-password" className={inputCls} value={f.new} onChange={(e) => setF({ ...f, new: e.target.value })} /></Field>
           <Field label="Confirmar nova senha"><input required minLength={10} type="password" autoComplete="new-password" className={inputCls} value={f.confirm} onChange={(e) => setF({ ...f, confirm: e.target.value })} /></Field>
-          {msg && <div role="status" className={`border px-3 py-2 text-sm ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{msg.t}</div>}
+          {msg && <Notice tone={msg.ok ? "ok" : "crit"}>{msg.t}</Notice>}
           <div><Button disabled={busy}>{busy ? "Salvando…" : "Trocar senha"}</Button></div>
         </form>
       </Card>

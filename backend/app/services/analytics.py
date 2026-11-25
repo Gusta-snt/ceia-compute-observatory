@@ -299,21 +299,45 @@ def heatmap(db: Session, machine_ids: list[int], metric: str, days: int) -> dict
     start = end - timedelta(days=days)
     tz = local_tz()
     cells: dict[tuple[int, int], list[float]] = defaultdict(lambda: [0.0, 0.0])
+    # Detalhe por célula (dia da semana × hora): média de cada máquina, faixa das horas observadas,
+    # quantos dias entraram e quantas amostras. Usado pelo painel lateral do mapa de calor.
+    per_m: dict[tuple[int, int], dict[int, list[float]]] = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
+    hours: dict[tuple[int, int], list[float]] = defaultdict(list)
+    dates: dict[tuple[int, int], set] = defaultdict(set)
+    nsamp: dict[tuple[int, int], int] = defaultdict(int)
     counted = 0
     for mid in machine_ids:
         for r in bucket_rows(db, mid, start, end, 3600, [metric]):
             d = r[metric]
             if d["wd"] > 0:
                 loc = datetime.fromtimestamp(r["t"], tz)
-                c = cells[(loc.weekday(), loc.hour)]
+                k = (loc.weekday(), loc.hour)
+                c = cells[k]
                 c[0] += d["ws"]
                 c[1] += d["wd"]
+                pm = per_m[k][mid]
+                pm[0] += d["ws"]
+                pm[1] += d["wd"]
+                hours[k].append(d["ws"] / d["wd"])
+                dates[k].add(loc.date())
+                nsamp[k] += r["n"]
                 counted += r["n"]
     grid = [[(round(cells[(w, h)][0] / cells[(w, h)][1], 2) if cells[(w, h)][1] > 0 else None) for h in range(24)]
             for w in range(7)]
+    names = dict(db.execute(select(Machine.id, Machine.name).where(Machine.id.in_(machine_ids))).all()) if machine_ids else {}
+
+    def detail(k: tuple[int, int]) -> dict[str, Any] | None:
+        if not hours[k]:
+            return None
+        ms = sorted(({"id": mid, "name": names.get(mid, str(mid)), "mean": round(v[0] / v[1], 2)}
+                     for mid, v in per_m[k].items() if v[1] > 0), key=lambda x: -x["mean"])
+        return {"min": round(min(hours[k]), 2), "max": round(max(hours[k]), 2), "days": len(dates[k]),
+                "samples": nsamp[k], "machines": ms}
+
+    details = [[detail((w, h)) for h in range(24)] for w in range(7)]
     span_days = days
     enough = counted >= 24 * 7 * 12 and span_days >= 3  # ao menos ~1 amostra de 5min por célula
-    return {"metric": metric, "days": days, "timezone": get_settings().timezone, "grid": grid,
+    return {"metric": metric, "days": days, "timezone": get_settings().timezone, "grid": grid, "details": details,
             "sufficient": enough, "samples": counted}
 
 

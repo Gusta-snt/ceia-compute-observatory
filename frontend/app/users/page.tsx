@@ -3,7 +3,8 @@ import { useState } from "react";
 import { api, ago, fmtDateTime } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 import { ROLE_LABEL, useMe } from "@/lib/me";
-import { Button, Card, Empty, ErrorBox, Field, Loading, Restricted, inputCls } from "@/components/ui";
+import { Button, Card, Empty, ErrorBox, Field, Loading, Restricted, inputCls, Notice } from "@/components/ui";
+import { Select } from "@/components/Select";
 
 type U = { id: number; username: string; name: string | null; role: string; active: boolean; last_login: string | null; created_at: string };
 const EMPTY = { username: "", name: "", password: "", role: "usuario" };
@@ -31,32 +32,32 @@ function Users({ meId }: { meId: number }) {
   return (
     <div className="page space-y-5">
       <header>
-        <h1 className="text-xl font-medium text-navy-900">Usuários</h1>
+        <h1 className="text-2xl font-medium text-heading">Usuários</h1>
         <p className="text-sm text-mute">
           <b className="font-medium text-ink">Usuários</b> acessam painéis, análises, alertas e projetos. <b className="font-medium text-ink">Administradores</b> também cadastram máquinas, gerenciam tokens, configurações e usuários.
         </p>
       </header>
-      {msg && <div role="status" className={`border px-3 py-2 text-sm ${msg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{msg.t}</div>}
+      {msg && <Notice tone={msg.ok ? "ok" : "crit"}>{msg.t}</Notice>}
 
       <Card title="Contas">
         {users.loading && !users.data ? <Loading /> : users.error ? <ErrorBox message={users.error} onRetry={users.reload} /> : !users.data?.length ? <Empty>Nenhum usuário.</Empty> : (
-          <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-xs text-mute"><tr><th className="py-1">Usuário</th><th>Nome</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th /></tr></thead>
+          <div className="relative overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
+            <thead className="text-left text-label text-mute"><tr><th className="py-1">Usuário</th><th>Nome</th><th>Papel</th><th>Situação</th><th>Último acesso</th><th /></tr></thead>
             <tbody>{users.data.map((u) => {
               const self = u.id === meId;
               return (
                 <tr key={u.id} className="border-t border-line">
-                  <td className="whitespace-nowrap py-1.5 font-medium">{u.username}{self && <span className="ml-2 text-xs text-mute">(você)</span>}</td>
+                  <td className="whitespace-nowrap py-1.5 font-medium">{u.username}{self && <span className="ml-2 text-label text-mute">(você)</span>}</td>
                   <td>{u.name ?? <span className="text-mute">—</span>}</td>
-                  <td><span className={`inline-block border px-2 py-0.5 text-xs ${u.role === "admin" ? "border-navy-900 bg-navy-900 text-white" : "border-line bg-slate-50"}`}>{ROLE_LABEL[u.role] ?? u.role}</span></td>
-                  <td className="text-xs">{u.active ? "Ativo" : <span className="text-red-700">Desativado</span>}</td>
-                  <td className="text-xs" title={fmtDateTime(u.last_login)}>{u.last_login ? ago(u.last_login) : "nunca"}</td>
-                  <td className="space-x-3 text-right text-xs">
+                  <td><span className={`inline-block border px-2 py-0.5 text-label ${u.role === "admin" ? "border-heading bg-heading text-surface" : "border-line bg-sunken"}`}>{ROLE_LABEL[u.role] ?? u.role}</span></td>
+                  <td className="text-label">{u.active ? "Ativo" : <span className="text-crit-fg">Desativado</span>}</td>
+                  <td className="text-label" title={fmtDateTime(u.last_login)}>{u.last_login ? ago(u.last_login) : "nunca"}</td>
+                  <td className="space-x-3 text-right text-label">
                     <button className="underline" onClick={() => { const n = prompt("Nome de exibição:", u.name ?? ""); if (n === null) return; run(() => api(`/users/${u.id}`, { method: "PATCH", json: { name: n } }), "Nome alterado."); }}>renomear</button>
                     {!self && <button className="underline" onClick={() => run(() => api(`/users/${u.id}`, { method: "PATCH", json: { role: u.role === "admin" ? "usuario" : "admin" } }), u.role === "admin" ? `${u.username} agora é usuário.` : `${u.username} agora é administrador.`)}>{u.role === "admin" ? "tornar usuário" : "tornar admin"}</button>}
                     <button className="underline" onClick={() => resetPassword(u)}>redefinir senha</button>
                     {!self && <button className="underline" onClick={() => run(() => api(`/users/${u.id}`, { method: "PATCH", json: { active: !u.active } }), u.active ? `${u.username} desativado.` : `${u.username} reativado.`)}>{u.active ? "desativar" : "reativar"}</button>}
-                    {!self && <button className="text-red-600 underline" onClick={() => { if (!confirm(`Apagar o usuário "${u.username}"? Isso não pode ser desfeito.`)) return; run(() => api(`/users/${u.id}`, { method: "DELETE" }), "Usuário apagado."); }}>apagar</button>}
+                    {!self && <button className="text-crit-fg underline" onClick={() => { if (!confirm(`Apagar o usuário "${u.username}"? Isso não pode ser desfeito.`)) return; run(() => api(`/users/${u.id}`, { method: "DELETE" }), "Usuário apagado."); }}>apagar</button>}
                   </td>
                 </tr>);
             })}</tbody>
@@ -73,10 +74,10 @@ function Users({ meId }: { meId: number }) {
           <Field label="Nome de exibição (opcional)"><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label="Senha inicial (mínimo 10 caracteres)"><input required minLength={10} type="password" autoComplete="new-password" className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
           <Field label="Papel">
-            <select className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="usuario">Usuário — usa a central, sem administrar</option>
-              <option value="admin">Administrador — acesso total</option>
-            </select>
+            <Select size="md" label="Papel" value={form.role} onChange={(v) => setForm({ ...form, role: v })} options={[
+              { value: "usuario", label: "Usuário", hint: "usa a central, sem administrar" },
+              { value: "admin", label: "Administrador", hint: "acesso total" },
+            ]} />
           </Field>
           <div><Button>Criar usuário</Button></div>
         </form>

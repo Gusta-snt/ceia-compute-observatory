@@ -14,18 +14,21 @@ export default function Login() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
-    try { await api("/auth/login", { method: "POST", json: { username: u, password: p } }); await refreshMe(); r.push("/"); }
+    try { await api("/auth/login", { method: "POST", json: { username: u, password: p } }); await refreshMe();
+      // Volta para onde a pessoa estava; só caminhos internos (nunca "//outro-site").
+      const next = new URLSearchParams(location.search).get("next");
+      r.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/"); }
     catch (x: any) { setErr(x.message); } finally { setBusy(false); }
   }
   return (
     <div className="bg-drift flex min-h-screen items-center justify-center bg-gradient-to-br from-ceia-dark via-ceia to-[#24479f] p-4">
-      <form onSubmit={submit} className="anim-rise w-full max-w-sm space-y-4 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,.55)]">
+      <form onSubmit={submit} data-theme="light" className="text-ink w-full max-w-sm space-y-4 bg-surface p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,.55)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/ceia-cor.png" alt="CEIA — Centro de Excelência em Inteligência Artificial" className="h-14 w-auto" />
-        <h1 className="text-lg font-medium text-navy-900">CEIA Compute Observatory</h1>
+        <h1 className="text-lg font-medium text-heading">CEIA Compute Observatory</h1>
         <Field label="Usuário"><input className={inputCls} value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" required /></Field>
         <Field label="Senha"><input className={inputCls} type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required /></Field>
-        {err && <div key={err} role="alert" className="anim-rise text-sm text-red-700">{err}</div>}
+        {err && <div key={err} role="alert" className="text-sm text-crit-fg">{err}</div>}
         <Button disabled={busy} className="w-full">{busy ? "Entrando…" : "Entrar"}</Button>
       </form>
     </div>

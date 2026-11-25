@@ -8,7 +8,7 @@ export async function api<T = any>(path: string, init?: RequestInit & { json?: u
   if (init?.json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
   const r = await fetch(`/api/v1${path}`, { ...init, body, headers: { ...headers, ...(init?.headers as any) }, credentials: "same-origin" });
   if (r.status === 401 && typeof window !== "undefined" && !location.pathname.startsWith("/login")) {
-    location.href = "/login";
+    location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
   }
   if (!r.ok) {
     let msg = r.statusText;
@@ -23,7 +23,7 @@ export function fmtBytes(v: number | null | undefined): string {
   if (v == null) return "—";
   const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0; let x = v;
   while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
-  return `${x.toFixed(x >= 100 ? 0 : 1)} ${u[i]}`;
+  return `${x.toFixed(x >= 100 ? 0 : 1)}\u00a0${u[i]}`;
 }
 export const fmtRate = (v: number | null | undefined) => (v == null ? "—" : `${fmtBytes(v)}/s`);
 export function fmtDur(s: number): string {

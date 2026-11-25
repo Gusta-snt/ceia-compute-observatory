@@ -53,6 +53,9 @@ async def _periodic() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
+    # Com a chave padrão qualquer um forjaria um cookie de sessão de admin; fora do SQLite de dev, não sobe.
+    if s.secret_key == "change-me-in-production" and not s.database_url.startswith("sqlite"):
+        raise RuntimeError("SECRET_KEY não definida: configure uma chave aleatória (openssl rand -hex 32)")
     if s.database_url.startswith("sqlite"):
         Base.metadata.create_all(get_engine())  # SQLite: apenas desenvolvimento/testes; produção usa Alembic
     bootstrap_admin()

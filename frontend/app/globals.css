@@ -3,53 +3,111 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------- tokens
+   Triplas RGB lidas pelo tailwind.config.ts. A interface fica neutra; cor só para ação, estado e
+   séries de dados. Estado: ok (online), warn (atenção), crit (sem comunicação / pressão),
+   idle (subutilizada), unknown (sem dados). */
+:root, [data-theme="light"] {
+  --ink: 31 41 51; --mute: 91 107 121; --heading: 2 48 72;
+  --line: 223 229 234; --line-strong: 195 204 213;
+  --paper: 244 246 248; --surface: 255 255 255; --sunken: 236 240 244;
+  --action: 35 117 228;
+
+  --ok-fg: 4 108 78;    --ok-bg: 236 250 244;   --ok-line: 167 222 196;  --ok-dot: 16 163 107;
+  --warn-fg: 146 64 14; --warn-bg: 255 247 235; --warn-line: 247 205 150; --warn-dot: 217 119 6;
+  --crit-fg: 159 28 28; --crit-bg: 254 242 242; --crit-line: 248 170 170; --crit-dot: 220 38 38;
+  --idle-fg: 12 84 110; --idle-bg: 234 248 252; --idle-line: 150 216 236; --idle-dot: 18 165 207;
+  --unknown-fg: 71 85 105; --unknown-bg: 241 245 249; --unknown-line: 203 213 225; --unknown-dot: 148 163 184;
+
+  /* Séries categóricas (sem violeta): da 9ª máquina em diante as séries ficam em cinza. */
+  --data-1: #2375e4; --data-2: #12a5cf; --data-3: #0c3a5c; --data-4: #c2610c;
+  --data-5: #2f8f46; --data-6: #c2416b; --data-7: #8a7a12; --data-8: #5f7185; --data-rest: #b4bec8;
+  --chart-grid: #e8edf1; --chart-axis: #5b6b79;
+
+  --m-in: 150ms; --m-out: 120ms; --m-press: 90ms; --m-panel: 200ms;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  color-scheme: light;
+}
+
+/* Tema escuro: usado pelo modo quiosque (TV/painel de parede). */
+[data-theme="dark"] {
+  --ink: 226 233 240; --mute: 150 166 182; --heading: 240 245 250;
+  --line: 38 58 78; --line-strong: 60 84 108;
+  --paper: 3 18 30; --surface: 9 30 47; --sunken: 18 44 64;
+  --action: 96 165 250;
+
+  --ok-fg: 110 231 183;   --ok-bg: 6 52 42;     --ok-line: 20 110 80;   --ok-dot: 52 211 153;
+  --warn-fg: 252 211 77;  --warn-bg: 66 42 6;   --warn-line: 140 90 10; --warn-dot: 245 158 11;
+  --crit-fg: 254 160 160; --crit-bg: 72 14 18;  --crit-line: 150 40 40; --crit-dot: 248 81 81;
+  --idle-fg: 125 222 250; --idle-bg: 8 50 70;   --idle-line: 20 110 140; --idle-dot: 56 200 240;
+  --unknown-fg: 180 192 205; --unknown-bg: 30 46 62; --unknown-line: 70 90 110; --unknown-dot: 120 138 156;
+
+  --data-1: #60a5fa; --data-2: #38d0f5; --data-3: #e2e9f0; --data-4: #f59e42;
+  --data-5: #5fd07a; --data-6: #f472a0; --data-7: #d6c24a; --data-8: #9fb0c2; --data-rest: #4a6078;
+  --chart-grid: #1d3a52; --chart-axis: #96a6b6;
+  color-scheme: dark;
+}
+
 body { @apply bg-paper text-ink antialiased; }
-:focus-visible { outline: 2px solid #2375e4; outline-offset: 2px; }
+/* No escuro, a faixa de marca (menu lateral) desce para um azul CEIA profundo, sem brilhar mais que o conteúdo. */
+[data-theme="dark"] .sidebar { background-color: #0d1e48; border-right: 1px solid rgb(var(--line)); }
+/* Item ativo da navegação: pílula sólida clara com texto escuro, legível nos dois temas. */
+.nav-on { background-color: #ffffff; color: #1c3882; }
+[data-theme="dark"] .nav-on { background-color: #dbe4f0; color: #0d1e48; }
+:focus-visible { outline: 2px solid rgb(var(--action)); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 
 /* ---------------------------------------------------------------- superfícies do navegador */
-::selection { background: rgba(35, 117, 228, .18); color: #023048; }
-html { accent-color: #2375e4; caret-color: #2375e4; scrollbar-color: #c3ccd5 transparent; }
+::selection { background: rgb(var(--action) / .18); }
+html { accent-color: rgb(var(--action)); caret-color: rgb(var(--action)); scrollbar-color: rgb(var(--line-strong)) transparent; }
 a { text-underline-offset: 3px; }
 
+/* Link único: hairline em repouso, a linha cheia se desenha ao passar o mouse. */
+.link {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat,
+              linear-gradient(rgb(var(--line-strong)), rgb(var(--line-strong))) 0 100% / 100% 1px no-repeat;
+  transition: background-size var(--m-out) var(--ease);
+}
+.link:hover, .link:focus-visible { background-size: 100% 1px, 100% 1px; transition-duration: var(--m-in); }
+
 /* Tabelas de dados: mesmo respiro em todas as páginas e numerais tabulares. */
-main table:not(.heat) th { padding: .25rem .625rem .375rem 0; font-weight: 500; white-space: nowrap; }
-main table:not(.heat) td { padding: .5rem .625rem .5rem 0; font-variant-numeric: tabular-nums; }
+main table:not(.heat) th { padding: .25rem .75rem .5rem 0; font-weight: 500; white-space: nowrap; }
+main table:not(.heat) td { padding: .625rem .75rem .625rem 0; font-variant-numeric: tabular-nums; }
 main table:not(.heat) :is(th, td):last-child { padding-right: 0; }
-main table:not(.heat) tbody tr { transition: background-color .15s ease; }
-main table:not(.heat) tbody tr:hover { background-color: #f6f9fc; }
+main table:not(.heat) tbody tr { transition: background-color var(--m-out) var(--ease); }
+main table:not(.heat) tbody tr:hover { background-color: rgb(var(--sunken) / .6); transition-duration: var(--m-in); }
+
+/* Linha inteira clicável: o link da primeira célula cobre a linha. */
+tr.row-link { position: relative; }
+tr.row-link a.row-target::after { content: ""; position: absolute; inset: 0; }
+tr.row-link:focus-within { outline: 2px solid rgb(var(--action)); outline-offset: -2px; }
+tr.row-link a.row-target:focus-visible { outline: none; }
 
 /* ---------------------------------------------------------------- movimento
-   Um momento só: a página assenta, os indicadores entram em sequência, barras crescem e as linhas do
-   gráfico são desenhadas. Tudo parte de um estado já visível e só na montagem: as atualizações ao vivo
-   (SSE a cada 5 s) mantêm as chaves React, então o que já está na tela não anima de novo. */
-@keyframes rise { from { opacity: .35; transform: translateY(4px); } to { opacity: 1; transform: none; } }
-@keyframes fade { from { opacity: .35; } to { opacity: 1; } }
-@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+   Só como resposta ao usuário. Nada entra animado ao carregar nem ao rolar; valores ao vivo trocam
+   com um fade curto. A exceção é o desenho inicial das linhas do gráfico (charts.tsx). */
+@keyframes fade { from { opacity: .4; } to { opacity: 1; } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@keyframes ping-soft { 0% { transform: scale(1); opacity: .55; } 80%, 100% { transform: scale(2.4); opacity: 0; } }
-@keyframes drift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes flash { from { background-color: rgb(var(--action) / .16); } to { background-color: transparent; } }
 
-.anim-tick { animation: fade .5s cubic-bezier(.16, 1, .3, 1) backwards; }
-.anim-rise { animation: rise .4s cubic-bezier(.16, 1, .3, 1) backwards; }
-.anim-fade { animation: fade .3s ease-out backwards; }
-.anim-grow { transform-origin: left; animation: grow-x .7s cubic-bezier(.16, 1, .3, 1) backwards; }
-.page { animation: rise .35s cubic-bezier(.16, 1, .3, 1) backwards; }
+.anim-tick { animation: fade var(--m-in) var(--ease) backwards; }
+.anim-fade { animation: fade .2s ease-out backwards; }
+.flash { animation: flash .6s ease-out; }
 
-/* Indicadores: cada um entra 40 ms depois do anterior. */
-.stagger > * { animation: rise .5s cubic-bezier(.16, 1, .3, 1) backwards; }
-.stagger > *:nth-child(2) { animation-delay: 40ms; } .stagger > *:nth-child(3) { animation-delay: 80ms; }
-.stagger > *:nth-child(4) { animation-delay: 120ms; } .stagger > *:nth-child(5) { animation-delay: 160ms; }
-.stagger > *:nth-child(6) { animation-delay: 200ms; } .stagger > *:nth-child(7) { animation-delay: 240ms; }
-.stagger > *:nth-child(n+8) { animation-delay: 280ms; }
+/* Botões: sobem 1px no hover (ponteiro fino), afundam ao clicar. */
+.btn { transition: background-color var(--m-out) var(--ease), border-color var(--m-out) var(--ease), transform var(--m-out) var(--ease); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:not(:disabled):hover { transform: translateY(-1px); transition-duration: var(--m-in); }
+  .lift { transition: transform var(--m-out) var(--ease), border-color var(--m-out) var(--ease); }
+  .lift:hover { transform: translateY(-2px); border-color: rgb(var(--line-strong)); transition-duration: var(--m-in); }
+}
+.btn:not(:disabled):active { transform: translateY(1px) scale(.985); transition-duration: var(--m-press); }
 
 .skeleton {
-  background: linear-gradient(90deg, #e9eef2 25%, #f5f8fa 50%, #e9eef2 75%);
+  background: linear-gradient(90deg, rgb(var(--sunken)) 25%, rgb(var(--surface)) 50%, rgb(var(--sunken)) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
-.ping-soft { animation: ping-soft 1.8s cubic-bezier(0, 0, .2, 1) infinite; }
-.bg-drift { background-size: 200% 200%; animation: drift 18s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -32,11 +32,18 @@ with SessionLocal() as db:
             day = 1.0 if 8 <= hour <= 20 else 0.4
             g = max(0, min(100, gpu_base * day + random.gauss(0, 5)))
             u = max(0, min(100, mem_base + random.gauss(0, 2)))
+            # Disco: leitura contínua proporcional à GPU, com cargas de dataset (picos de alguns minutos a cada
+            # ~3 h, defasadas por máquina); escrita baixa, com checkpoints a cada 45 min quando há treino.
+            phase = (i + gpu_base * 997) % 10800
+            read = 2e6 + g * 4e5 * random.uniform(0.6, 1.4) + (random.uniform(4e8, 9e8) if phase < 300 and g > 10 else 0)
+            write = 4e5 + g * 6e4 * random.uniform(0.5, 1.5) + (random.uniform(1.5e8, 3e8) if (i % 2700) < 120 and g > 20 else 0)
             rows.append(dict(machine_id=m.id, ts=t, ts_epoch=int(t.timestamp()), dur=60.0, gpu_util_percent=g,
                              unified_percent=u, mem_percent=u, cpu_percent=max(0, g * 0.4 + random.gauss(0, 3)),
-                             unified_total_bytes=128 * 1024**3, unified_available_bytes=128 * 1024**3 * (1 - u / 100),
+                             unified_total_bytes=128 * 1024**3, unified_available_bytes=128 * 1024**3 * (1 - u / 100), unified_used_bytes=128 * 1024**3 * u / 100,
                              mem_total_bytes=128 * 1024**3, mem_available_bytes=128 * 1024**3 * (1 - u / 100),
                              disk_percent=45.0, disk_free_bytes=2.2e12, disk_total_bytes=4e12,
+                             disk_read_bps=read, disk_write_bps=write,
+                             net_rx_bps=1e5 + g * 2e5 * random.uniform(0.5, 1.5), net_tx_bps=5e4 + g * 5e4 * random.uniform(0.5, 1.5),
                              psi_memory_some_avg10=max(0, (u - 85) / 3), gpu_temp_c=45 + g * 0.3, gpu_power_w=20 + g))
         db.bulk_insert_mappings(Sample, rows)
     set_group(db, "branding", {"demo_mode": True})
